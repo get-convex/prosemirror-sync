@@ -1,6 +1,5 @@
 import { ConvexReactClient, useConvex, useQuery, Watch } from "convex/react";
-import { Extension } from "@tiptap/react";
-import { Content, createDocument, Editor } from "@tiptap/core";
+import { Content, createDocument, Editor, Extension } from "@tiptap/core";
 import * as collab from "@tiptap/pm/collab";
 import { Schema } from "@tiptap/pm/model";
 import { Step } from "@tiptap/pm/transform";
@@ -26,7 +25,7 @@ export function useSync(
       clientId: initial.clientId,
       restoredSteps: initial.steps,
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [convex, id, initial.loading, initial.content]);
   if (initial.loading) {
     return {
@@ -197,12 +196,12 @@ export function sync(
       }
       watch = convex.watchQuery(opts.syncApi.getVersion, { id });
       unsubscribe = watch.onUpdate(() => {
-        trySync(this.editor);
+        void trySync(this.editor);
       });
-      trySync(this.editor);
+      void trySync(this.editor);
     },
     onUpdate() {
-      trySync(this.editor);
+      void trySync(this.editor);
     },
     addProseMirrorPlugins() {
       log("Adding collab plugin", {

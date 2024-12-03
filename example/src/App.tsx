@@ -3,7 +3,7 @@ import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { api } from "../convex/_generated/api";
 import { Content, Extension, getSchema } from "@tiptap/core";
-import { useSync } from "./sync";
+import { useSync } from "@convex-dev/prosemirror-sync/tiptap";
 
 const defaultExtensions = [StarterKit];
 const schema = getSchema(defaultExtensions);

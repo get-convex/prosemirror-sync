@@ -33,7 +33,7 @@
   "files": [
     "dist",
     "src",
-    "react"
+    "tiptap"
   ],
   "exports": {
     "./package.json": "./package.json",
@@ -49,16 +49,16 @@
         "default": "./dist/commonjs/client/index.js"
       }
     },
-    "./react": {
+    "./tiptap": {
       "import": {
-        "@convex-dev/component-source": "./src/react/index.ts",
-        "types": "./dist/esm/react.d.ts",
-        "default": "./dist/esm/react.js"
+        "@convex-dev/component-source": "./src/tiptap/index.ts",
+        "types": "./dist/esm/tiptap.d.ts",
+        "default": "./dist/esm/tiptap.js"
       },
       "require": {
-        "@convex-dev/component-source": "./src/react/index.ts",
-        "types": "./dist/commonjs/react.d.ts",
-        "default": "./dist/commonjs/react.js"
+        "@convex-dev/component-source": "./src/tiptap/index.ts",
+        "types": "./dist/commonjs/tiptap.d.ts",
+        "default": "./dist/commonjs/tiptap.js"
       }
     },
     "./convex.config": {
@@ -70,11 +70,14 @@
     }
   },
   "peerDependencies": {
-    "convex": "~1.16.5 || ~1.17.0"
+    "convex": "~1.16.5 || ~1.17.0",
+    "react": "^18.3.1",
+    "@tiptap/core": "^2.7.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.9.1",
     "@types/node": "^18.17.0",
+    "@types/react": "^18.3.3",
     "convex-test": "^0.0.33",
     "eslint": "^9.9.1",
     "globals": "^15.9.0",
