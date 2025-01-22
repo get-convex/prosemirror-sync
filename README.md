@@ -17,7 +17,7 @@ Just configure your editor features, add this component to your Convex backend,
 and use the `useTiptapSync` React hook.
 Read this [Stack post](https://stack.convex.dev/add-a-collaborative-document-editor-to-your-app) for more details.
 
-[![Example of editing](http://img.youtube.com/vi/TGd-Nl7PBYQ/0.jpg)](http://www.youtube.com/watch?v=TGd-Nl7PBYQ "Collaborative editing syncing")
+[![Example of editing](https://img.youtube.com/vi/TGd-Nl7PBYQ/0.jpg)](http://www.youtube.com/watch?v=TGd-Nl7PBYQ "Collaborative editing syncing")
 
 Example usage, see [below](#usage) for more details:
 
