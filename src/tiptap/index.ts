@@ -382,15 +382,16 @@ function getCachedState(
   id: string,
   cacheKeyPrefix?: string
 ): InitialState | undefined {
+  return;
   // TODO: Verify that this works
-  const cacheKey = `${cacheKeyPrefix ?? "convex-sync"}-${id}`;
-  const cache = sessionStorage.getItem(cacheKey);
-  if (cache) {
-    const { content, version, steps } = JSON.parse(cache);
-    return {
-      initialContent: content as Content,
-      initialVersion: Number(version),
-      restoredSteps: (steps ?? []) as object[],
-    };
-  }
+  // const cacheKey = `${cacheKeyPrefix ?? "convex-sync"}-${id}`;
+  // const cache = sessionStorage.getItem(cacheKey);
+  // if (cache) {
+  //   const { content, version, steps } = JSON.parse(cache);
+  //   return {
+  //     initialContent: content as Content,
+  //     initialVersion: Number(version),
+  //     restoredSteps: (steps ?? []) as object[],
+  //   };
+  // }
 }
