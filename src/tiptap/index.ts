@@ -8,7 +8,7 @@ import {
 import { Content, Editor, Extension, JSONContent } from "@tiptap/core";
 import * as collab from "@tiptap/pm/collab";
 import { Step } from "@tiptap/pm/transform";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import { SyncApi } from "../client";
 
 // How many steps we will attempt to sync in one request.
@@ -338,25 +338,30 @@ export function useInitialState(
   id: string,
   cacheKeyPrefix?: string
 ) {
-  const [initial, setInitial] = useState<InitialState | undefined>(() =>
-    getCachedState(id, cacheKeyPrefix)
-  );
-  let data = initial;
+  const serverRef = useRef<{
+    id: string;
+    snapshot?: InitialState;
+  }>({ id });
+  const cachedState = useMemo(() => {
+    return getCachedState(id, cacheKeyPrefix);
+  }, [id, cacheKeyPrefix]);
   const serverInitial = useQuery(
     syncApi.getSnapshot,
-    initial ? "skip" : { id }
+    serverRef.current.snapshot && serverRef.current.id === id ? "skip" : { id }
   );
-  const [loading, setLoading] = useState(!initial);
-  if (loading && serverInitial) {
-    setLoading(false);
+  const snapshot = useMemo(() => {
+    return (
+      serverInitial &&
+      serverInitial.content !== null && {
+        initialContent: JSON.parse(serverInitial.content) as Content,
+        initialVersion: serverInitial.version,
+      }
+    );
+  }, [serverInitial]);
+  if (snapshot || serverRef.current.id !== id) {
+    serverRef.current = { id, snapshot: snapshot || undefined };
   }
-  if (!initial && serverInitial && serverInitial.content !== null) {
-    data = {
-      initialContent: JSON.parse(serverInitial.content) as Content,
-      initialVersion: serverInitial.version,
-    };
-    setInitial(data);
-  }
+  const data = serverRef.current.snapshot || cachedState;
 
   if (data) {
     return {
@@ -364,7 +369,7 @@ export function useInitialState(
       ...data,
     };
   }
-  if (!loading) {
+  if (!cachedState && serverInitial?.content === null) {
     // We couldn't find it locally or on the server.
     // We could dynamically create a new document here,
     // not sure if that's generally the right pattern (vs. explicit creation).
