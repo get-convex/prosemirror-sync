@@ -93,7 +93,7 @@
     "@blocknote/core": "^0.29.1 || ^0.30.0 || ^0.31.0"
   },
   "devDependencies": {
-    "@blocknote/core": "^0.31.1",
+    "@blocknote/core": "0.31.1",
     "@eslint/js": "9.27.0",
     "@types/node": "18.19.103",
     "@types/react": "19.1.5",
