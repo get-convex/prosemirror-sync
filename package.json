@@ -95,7 +95,7 @@
   "devDependencies": {
     "@blocknote/core": "0.31.1",
     "@eslint/js": "9.27.0",
-    "@types/node": "18.19.103",
+    "@types/node": "18.19.104",
     "@types/react": "19.1.6",
     "convex-test": "0.0.37",
     "eslint": "9.27.0",
