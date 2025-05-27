@@ -1,0 +1,391 @@
+import { components } from './_generated/api';
+
+import { ProsemirrorSync } from '@convex-dev/prosemirror-sync';
+
+import { GenericQueryCtx, GenericMutationCtx } from 'convex/server';
+
+import { DataModel } from './_generated/dataModel';
+
+import { getAuthUserId } from "@convex-dev/auth/server";
+
+const prosemirrorSync = new ProsemirrorSync(components.prosemirrorSync);
+
+async function checkPermissions(ctx: GenericQueryCtx<DataModel> | GenericMutationCtx<DataModel>, id: string) {
+
+  const userId = await getAuthUserId(ctx);
+
+  if (!userId) {
+
+    throw new Error("Unauthorized: User not logged in.");
+
+  }
+
+  // In a real app, you'd check if the user has access to the document with id.
+
+  // For this example, we'll allow any logged-in user to access any document.
+
+}
+
+export const { getSnapshot, submitSnapshot, latestVersion, getSteps, submitSteps } = prosemirrorSync.syncApi<DataModel>({
+
+  checkRead: checkPermissions,
+
+  checkWrite: checkPermissions,
+
+  onSnapshot: async (ctx, id, snapshot, version) => {
+
+    // You can add logic here to handle new snapshots, e.g. save to another table or trigger notifications.
+
+    console.log(New snapshot for document ${id} (version ${version}): ${snapshot});
+
+  }
+
+});
+
+// convex/convex.config.ts
+
+import { defineApp } from 'convex/server';
+
+import prosemirrorSync from '@convex-dev/prosemirror-sync/convex.config';
+
+const app = defineApp();
+
+app.use(prosemirrorSync);
+
+export default app;
+
+import { components } from './_generated/api';
+
+import { ProsemirrorSync } from '@convex-dev/prosemirror-sync';
+
+import { GenericQueryCtx, GenericMutationCtx } from 'convex/server';
+
+import { DataModel } from './_generated/dataModel';
+
+import { getAuthUserId } from "@convex-dev/auth/server";
+
+const prosemirrorSync = new ProsemirrorSync(components.prosemirrorSync);
+
+async function checkPermissions(ctx: GenericQueryCtx<DataModel> | GenericMutationCtx<DataModel>, id: string) {
+
+  const userId = await getAuthUserId(ctx);
+
+  if (!userId) {
+
+    throw new Error("Unauthorized: User not logged in.");
+
+  }
+
+  // In a real app, you'd check if the user has access to the document with id.
+
+  // For this example, we'll allow any logged-in user to access any document.
+
+}
+
+export const { getSnapshot, submitSnapshot, latestVersion, getSteps, submitSteps } = prosemirrorSync.syncApi<DataModel>({
+
+  checkRead: checkPermissions,
+
+  checkWrite: checkPermissions,
+
+  onSnapshot: async (ctx, id, snapshot, version) => {
+
+    // You can add logic here to handle new snapshots, e.g. save to another table or trigger notifications.
+
+    console.log(New snapshot for document ${id} (version ${version}): ${snapshot});
+
+  }
+
+});
+
+import { useBlockNoteSync } from '@convex-dev/prosemirror-sync/blocknote';
+
+import '@blocknote/core/fonts/inter.css';
+
+import { BlockNoteView } from '@blocknote/mantine';
+
+import '@blocknote/mantine/style.css';
+
+import { api } from '../convex/_generated/api';
+
+import { useQuery } from 'convex/react';
+
+function CollaborativeEditor({ documentId }: { documentId: string }) {
+
+  const sync = useBlockNoteSync(api.prosemirror, documentId);
+
+  if (sync.isLoading) {
+
+    return (
+
+      <div className="flex justify-center items-center p-4">
+
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+
+        <p className="ml-2 text-secondary">Loading editor...</p>
+
+      </div>
+
+    );
+
+  }
+
+  
+
+  if (!sync.editor) {
+
+     return (
+
+      <div className="flex flex-col items-center gap-4 p-4">
+
+        <p className="text-secondary">Document not found or failed to load.</p>
+
+        <button 
+
+          onClick={() => sync.create({ type: 'doc', content: [] })}
+
+          className="px-4 py-2 rounded bg-primary text-white font-semibold hover:bg-primary-hover transition-colors shadow-sm hover:shadow"
+
+        >
+
+          Create Document
+
+        </button>
+
+      </div>
+
+    );
+
+  }
+
+  return <BlockNoteView editor={sync.editor} />;
+
+}
+
+export function CollaborativeEditorWrapper({ documentId }: { documentId: string }) {
+
+  // The key prop ensures the component re-initializes when documentId changes.
+
+  return <CollaborativeEditor key={documentId} documentId={documentId} />;
+
+}
+
+import { Authenticated, Unauthenticated, useQuery } from "convex/react";
+
+import { api } from "../convex/_generated/api";
+
+import { SignInForm } from "./SignInForm";
+
+import { SignOutButton } from "./SignOutButton";
+
+import { Toaster } from "sonner";
+
+import { CollaborativeEditorWrapper } from "./CollaborativeEditor"; // Added import
+
+export default function App() {
+
+  return (
+
+    <div className="min-h-screen flex flex-col bg-gray-50">
+
+      <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-sm h-16 flex justify-between items-center border-b shadow-sm px-4">
+
+        <h2 className="text-xl font-semibold text-primary">Chef</h2>
+
+        <SignOutButton />
+
+      </header>
+
+      <main className="flex-1 flex flex-col items-center justify-center p-8"> {/* Changed to flex-col */}
+
+        <div className="w-full max-w-3xl mx-auto"> {/* Increased max-width */}
+
+          <Content />
+
+        </div>
+
+      </main>
+
+      <Toaster />
+
+    </div>
+
+  );
+
+}
+
+function Content() {
+
+  const loggedInUser = useQuery(api.auth.loggedInUser);
+
+  if (loggedInUser === undefined) {
+
+    return (
+
+      <div className="flex justify-center items-center">
+
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+
+      </div>
+
+    );
+
+  }
+
+  return (
+
+    <div className="flex flex-col gap-section">
+
+      <div className="text-center">
+
+        <h1 className="text-5xl font-bold text-primary mb-4">Cook with Chef</h1>
+
+        <Authenticated>
+
+          <p className="text-xl text-secondary mb-4">
+
+            Welcome back, {loggedInUser?.email ?? "friend"}!
+
+          </p>
+
+          {/* Added editor for authenticated users */}
+
+          <div className="mt-8 border rounded-lg shadow-md bg-white">
+
+            <h3 className="text-lg font-semibold p-4 border-b">Strategy Document</h3>
+
+            <CollaborativeEditorWrapper documentId="shared-strategy-doc" />
+
+          </div>
+
+        </Authenticated>
+
+        <Unauthenticated>
+
+          <p className="text-xl text-secondary">Sign in to get started</p>
+
+        </Unauthenticated>
+
+      </div>
+
+      <Unauthenticated>
+
+        <SignInForm />
+
+      </Unauthenticated>
+
+    </div>
+
+  );
+
+}
+
+import { Authenticated, Unauthenticated, useQuery } from "convex/react";
+
+import { api } from "../convex/_generated/api";
+
+import { SignInForm } from "./SignInForm";
+
+import { SignOutButton } from "./SignOutButton";
+
+import { Toaster } from "sonner";
+
+import { CollaborativeEditorWrapper } from "./CollaborativeEditor"; // Added import
+
+export default function App() {
+
+  return (
+
+    <div className="min-h-screen flex flex-col bg-gray-50">
+
+      <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-sm h-16 flex justify-between items-center border-b shadow-sm px-4">
+
+        <h2 className="text-xl font-semibold text-primary">Chef</h2>
+
+        <SignOutButton />
+
+      </header>
+
+      <main className="flex-1 flex flex-col items-center justify-center p-8"> {/* Changed to flex-col */}
+
+        <div className="w-full max-w-3xl mx-auto"> {/* Increased max-width */}
+
+          <Content />
+
+        </div>
+
+      </main>
+
+      <Toaster />
+
+    </div>
+
+  );
+
+}
+
+function Content() {
+
+  const loggedInUser = useQuery(api.auth.loggedInUser);
+
+  if (loggedInUser === undefined) {
+
+    return (
+
+      <div className="flex justify-center items-center">
+
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+
+      </div>
+
+    );
+
+  }
+
+  return (
+
+    <div className="flex flex-col gap-section">
+
+      <div className="text-center">
+
+        <h1 className="text-5xl font-bold text-primary mb-4">Cook with Chef</h1>
+
+        <Authenticated>
+
+          <p className="text-xl text-secondary mb-4">
+
+            Welcome back, {loggedInUser?.email ?? "friend"}!
+
+          </p>
+
+          {/* Added editor for authenticated users */}
+
+          <div className="mt-8 border rounded-lg shadow-md bg-white">
+
+            <h3 className="text-lg font-semibold p-4 border-b">Strategy Document</h3>
+
+            <CollaborativeEditorWrapper documentId="shared-strategy-doc" />
+
+          </div>
+
+        </Authenticated>
+
+        <Unauthenticated>
+
+          <p className="text-xl text-secondary">Sign in to get started</p>
+
+        </Unauthenticated>
+
+      </div>
+
+      <Unauthenticated>
+
+        <SignInForm />
+
+      </Unauthenticated>
+
+    </div>
+
+  );
+
+}
