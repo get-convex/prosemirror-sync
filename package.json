@@ -90,7 +90,7 @@
   },
   "peerDependencies": {
     "@blocknote/core": "^0.31.0 || ^0.32.0",
-    "@blocknote/mantine": "^0.31.0 || ^0.32.0",
+    "@blocknote/mantine": "^0.31.0 || ^0.32.0 || ^0.33.0",
     "@blocknote/react": "^0.31.0 || ^0.32.0",
     "@tiptap/core": "^2.7.0",
     "convex": ">=1.21.0 <1.35.0",
@@ -110,7 +110,7 @@
   },
   "devDependencies": {
     "@blocknote/core": "0.32.0",
-    "@blocknote/mantine": "0.32.0",
+    "@blocknote/mantine": "0.33.0",
     "@blocknote/react": "0.32.0",
     "@eslint/js": "9.29.0",
     "@tiptap/core": "^2.22.3",
