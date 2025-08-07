@@ -114,11 +114,16 @@ export function syncExtension(
 ): AnyExtension {
   const log: typeof console.log = opts?.debug ? console.debug : () => {};
   let snapshotTimer: NodeJS.Timeout | undefined;
+  let pendingSnapshot:
+    | { id: string; version: number; content: string }
+    | undefined;
   const trySubmitSnapshot = (version: number, content: string) => {
     if (snapshotTimer) {
       clearTimeout(snapshotTimer);
     }
+    pendingSnapshot = { id, version, content };
     snapshotTimer = setTimeout(() => {
+      pendingSnapshot = undefined;
       void convex
         .mutation(syncApi.submitSnapshot, { id, version, content })
         .catch(opts?.onSyncError);
@@ -195,6 +200,12 @@ export function syncExtension(
     name: "convex-sync",
     onDestroy() {
       log("destroying");
+      if (snapshotTimer) clearTimeout(snapshotTimer);
+      if (pendingSnapshot) {
+        void convex
+          .mutation(syncApi.submitSnapshot, pendingSnapshot)
+          .catch(opts?.onSyncError);
+      }
       unsubscribe?.();
     },
     onCreate() {
