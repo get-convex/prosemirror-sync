@@ -257,6 +257,7 @@ async function doSync(
       // a local cache. Creating a new document on the client will set the
       // initial version to 1 optimistically.
       log("Syncing new document", { id });
+      console.log("!!!!!!");
       await convex.mutation(syncApi.submitSnapshot, {
         id,
         version: initialState.initialVersion,
