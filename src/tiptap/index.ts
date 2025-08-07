@@ -189,6 +189,7 @@ export function syncExtension(
       if (pending) {
         const { resolve, reject } = pending;
         pending = undefined;
+        alert("!!");
         trySync(editor).then(resolve, reject);
       }
     }
