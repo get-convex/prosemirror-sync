@@ -189,7 +189,7 @@ export function syncExtension(
       if (pending) {
         const { resolve, reject } = pending;
         pending = undefined;
-        alert("!!");
+        console.log("pending", pending);
         trySync(editor).then(resolve, reject);
       }
     }
@@ -295,6 +295,7 @@ async function doSync(
     const steps = sendable.steps
       .slice(0, MAX_STEPS_SYNC)
       .map((step) => JSON.stringify(step.toJSON()));
+    console.log("steps", steps);
     log("Sending steps", { steps, version: sendable.version });
     const result = await convex.mutation(syncApi.submitSteps, {
       id,
@@ -302,6 +303,7 @@ async function doSync(
       version: sendable.version,
       clientId: sendable.clientID,
     });
+    console.log("result", result);
     if (result.status === "synced") {
       anyChanges = true;
       // We replay the steps locally to avoid refetching them.
