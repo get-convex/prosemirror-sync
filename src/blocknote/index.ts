@@ -1,6 +1,6 @@
 import { useMemo } from "react";
-import type { SyncApi } from "../client";
-import { type UseSyncOptions, useTiptapSync } from "../tiptap";
+import type { SyncApi } from "../client/index.js";
+import { type UseSyncOptions, useTiptapSync } from "../tiptap/index.js";
 import {
   type Block,
   BlockNoteEditor,
