@@ -115,7 +115,7 @@
     "@eslint/js": "9.36.0",
     "@tiptap/core": "2.26.2",
     "@types/node": "18.19.127",
-    "@types/react": "19.1.14",
+    "@types/react": "19.1.15",
     "chokidar-cli": "3.0.0",
     "convex-test": "0.0.38",
     "cpy-cli": "6.0.0",
