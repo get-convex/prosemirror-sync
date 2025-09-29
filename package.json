@@ -114,7 +114,7 @@
     "@blocknote/react": "0.39.1",
     "@eslint/js": "9.36.0",
     "@tiptap/core": "2.26.2",
-    "@types/node": "18.19.127",
+    "@types/node": "18.19.128",
     "@types/react": "19.1.15",
     "chokidar-cli": "3.0.0",
     "convex-test": "0.0.38",
