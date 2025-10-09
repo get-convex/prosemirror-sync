@@ -111,7 +111,7 @@
   "devDependencies": {
     "@blocknote/core": "0.34.0",
     "@blocknote/mantine": "0.34.0",
-    "@blocknote/react": "0.41.0",
+    "@blocknote/react": "0.41.1",
     "@eslint/js": "9.37.0",
     "@tiptap/core": "2.26.2",
     "@types/node": "18.19.129",
