@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@blocknote/core": "0.34.0",
-    "@blocknote/mantine": "0.34.0",
+    "@blocknote/mantine": "0.41.1",
     "@blocknote/react": "0.41.1",
     "@convex-dev/prosemirror-sync": "file:..",
     "@mantine/core": "^7.5.3",
