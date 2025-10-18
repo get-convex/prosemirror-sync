@@ -11,7 +11,7 @@
     "lint": "tsc -p convex && eslint convex && npx tsc --noEmit"
   },
   "dependencies": {
-    "@blocknote/core": "0.34.0",
+    "@blocknote/core": "0.41.1",
     "@blocknote/mantine": "0.34.0",
     "@blocknote/react": "0.41.1",
     "@convex-dev/prosemirror-sync": "file:..",
