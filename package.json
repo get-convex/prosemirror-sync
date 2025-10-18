@@ -113,7 +113,7 @@
     "@blocknote/mantine": "0.34.0",
     "@blocknote/react": "0.41.1",
     "@eslint/js": "9.38.0",
-    "@tiptap/core": "2.26.2",
+    "@tiptap/core": "2.26.3",
     "@types/node": "18.19.130",
     "@types/react": "19.2.2",
     "chokidar-cli": "3.0.0",
