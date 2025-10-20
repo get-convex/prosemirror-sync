@@ -109,7 +109,7 @@
     }
   },
   "devDependencies": {
-    "@blocknote/core": "0.34.0",
+    "@blocknote/core": "0.41.1",
     "@blocknote/mantine": "0.34.0",
     "@blocknote/react": "0.41.1",
     "@eslint/js": "9.38.0",
