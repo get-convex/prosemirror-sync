@@ -1,5 +1,10 @@
 import { v } from "convex/values";
-import { mutation, type MutationCtx, query, type QueryCtx } from "./_generated/server";
+import {
+  mutation,
+  type MutationCtx,
+  query,
+  type QueryCtx,
+} from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 import { vClientId } from "./schema";
 import { api } from "./_generated/api";

@@ -15,7 +15,6 @@ export type BlockNoteSyncOptions<Editor = BlockNoteEditor> = UseSyncOptions & {
    * the initialContent is parsed with the correct schema.
    */
   editorOptions?: Partial<
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     Omit<BlockNoteEditorOptions<any, any, any>, "initialContent">
   >;
   /**
@@ -78,7 +77,6 @@ export function useBlockNoteSync<Editor = BlockNoteEditor>(
       ...opts?.editorOptions,
       _headless: true,
     });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const blocks: Block<any, any, any>[] = [];
 
     // Convert the prosemirror document to BlockNote blocks.
