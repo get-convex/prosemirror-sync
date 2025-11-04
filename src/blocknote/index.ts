@@ -7,7 +7,7 @@ import {
   type BlockNoteEditorOptions,
   nodeToBlock,
 } from "@blocknote/core";
-import { JSONContent } from "@tiptap/core";
+import type { JSONContent } from "@tiptap/core";
 
 export type BlockNoteSyncOptions<Editor = BlockNoteEditor> = UseSyncOptions & {
   /**

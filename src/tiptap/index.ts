@@ -3,7 +3,7 @@ import {
   useConvex,
   useMutation,
   useQuery,
-  Watch,
+  type Watch,
 } from "convex/react";
 import {
   type AnyExtension,
@@ -15,7 +15,7 @@ import {
 import * as collab from "@tiptap/pm/collab";
 import { Step } from "@tiptap/pm/transform";
 import { useCallback, useMemo, useRef } from "react";
-import { SyncApi } from "../client/index.js";
+import type { SyncApi } from "../client/index.js";
 
 // How many steps we will attempt to sync in one request.
 const MAX_STEPS_SYNC = 1000;

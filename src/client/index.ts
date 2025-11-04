@@ -1,13 +1,13 @@
 import {
-  ApiFromModules,
-  GenericDataModel,
-  GenericMutationCtx,
-  GenericQueryCtx,
+  type ApiFromModules,
+  type GenericDataModel,
+  type GenericMutationCtx,
+  type GenericQueryCtx,
   mutationGeneric,
   queryGeneric,
 } from "convex/server";
-import { v, VString } from "convex/values";
-import { ComponentApi } from "../component/_generated/component.js";
+import { v, type VString } from "convex/values";
+import type { ComponentApi } from "../component/_generated/component.js";
 import { vClientId } from "../component/schema.js";
 import { Schema, Node } from "@tiptap/pm/model";
 import { Step, Transform } from "@tiptap/pm/transform";
