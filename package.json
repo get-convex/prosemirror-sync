@@ -20,72 +20,51 @@
   ],
   "type": "module",
   "scripts": {
-    "example": "cd example && npm run dev",
-    "dev": "run-p 'example' 'build:watch'",
-    "setup": "npm i && npm run build && cd example && npm i && npx convex dev --once",
-    "build": "npm run build:esm && npm run build:cjs",
-    "build:watch": "cd src && npx chokidar '../tsconfig.json' '*.ts' 'blocknote/**/*.ts' 'tiptap/**/*.ts' 'react/**/*.ts' 'component/**/*.ts' 'client/**/*.ts' -c 'npm run build' --initial",
-    "build:esm": "tsc --project ./esm.json && npm run copy:dts:esm && echo '{\\n  \"type\": \"module\"\\n}' > dist/esm/package.json",
-    "build:cjs": "tsc --project ./commonjs.json && npm run copy:dts:cjs && echo '{\\n  \"type\": \"commonjs\"\\n}' > dist/commonjs/package.json",
-    "copy:dts:esm": "cpy 'src/**/*.d.ts' 'dist/esm/' --parents",
-    "copy:dts:cjs": "cpy 'src/**/*.d.ts' 'dist/commonjs/' --parents",
-    "typecheck": "tsc --noEmit",
-    "prepare": "npm run build",
-    "prepack": "node node10stubs.mjs",
-    "postpack": "node node10stubs.mjs --cleanup",
-    "alpha": "rm -rf dist && npm run build && npm run test && npm version prerelease --preid alpha && npm publish --tag alpha && git push --tags",
-    "release": "rm -rf dist && npm run build && npm run test && npm version patch && npm publish && git push --tags && git push",
+    "dev": "run-p -r 'dev:*'",
+    "dev:backend": "convex dev --typecheck-components",
+    "dev:frontend": "cd example && vite --clearScreen false",
+    "dev:build": "npx chokidar 'tsconfig*.json' 'src/**/*.ts' -i '**/*.test.ts' -c 'npx convex codegen --component ./src/component && npm run build' --initial",
+    "predev": "npm run dev:backend -- --until-success",
+    "clean": "rm -rf dist *.tsbuildinfo",
+    "build": "tsc --project ./tsconfig.build.json",
+    "typecheck": "tsc --noEmit && tsc -p example && tsc -p example/convex",
+    "lint": "eslint src && eslint example",
+    "all": "run-p -r 'dev:*' 'test:watch'",
     "test": "vitest run --typecheck",
-    "test:watch": "vitest --typecheck",
+    "test:watch": "vitest --typecheck --clearScreen false",
     "test:debug": "vitest --inspect-brk --no-file-parallelism",
     "test:coverage": "vitest run --coverage --coverage.reporter=text",
-    "version": "printf '%s' $npm_package_version | pbcopy; vim CHANGELOG.md && git add CHANGELOG.md"
+    "attw": "attw $(npm pack -s) --exclude-entrypoints ./convex.config --profile esm-only",
+    "prepare": "npm run build",
+    "alpha": "npm run clean && npm ci && run-p test lint typecheck attw && npm version prerelease --preid alpha && npm publish --tag alpha && git push --tags",
+    "release": "npm run clean && npm ci && run-p test lint typecheck attw && npm version patch && npm publish && git push --tags",
+    "version": "pbcopy <<<$npm_package_version; vim CHANGELOG.md && prettier -w CHANGELOG.md && git add CHANGELOG.md"
   },
   "files": [
     "dist",
-    "src",
-    "tiptap",
-    "blocknote"
+    "src"
   ],
   "exports": {
     "./package.json": "./package.json",
     ".": {
-      "import": {
-        "@convex-dev/component-source": "./src/client/index.ts",
-        "types": "./dist/esm/client/index.d.ts",
-        "default": "./dist/esm/client/index.js"
-      },
-      "require": {
-        "@convex-dev/component-source": "./src/client/index.ts",
-        "types": "./dist/commonjs/client/index.d.ts",
-        "default": "./dist/commonjs/client/index.js"
-      }
-    },
-    "./tiptap": {
-      "import": {
-        "@convex-dev/component-source": "./src/tiptap/index.ts",
-        "types": "./dist/esm/tiptap/index.d.ts",
-        "default": "./dist/esm/tiptap/index.js"
-      },
-      "require": {
-        "@convex-dev/component-source": "./src/tiptap/index.ts",
-        "types": "./dist/commonjs/tiptap/index.d.ts",
-        "default": "./dist/commonjs/tiptap/index.js"
-      }
+      "types": "./dist/client/index.d.ts",
+      "default": "./dist/client/index.js"
     },
     "./blocknote": {
-      "import": {
-        "@convex-dev/component-source": "./src/blocknote/index.ts",
-        "types": "./dist/esm/blocknote/index.d.ts",
-        "default": "./dist/esm/blocknote/index.js"
-      }
+      "types": "./dist/blocknote/index.d.ts",
+      "default": "./dist/blocknote/index.js"
+    },
+    "./tiptap": {
+      "types": "./dist/tiptap/index.d.ts",
+      "default": "./dist/tiptap/index.js"
+    },
+    "./test": "./src/test.ts",
+    "./_generated/component.js": {
+      "types": "./dist/component/_generated/component.d.ts"
     },
     "./convex.config": {
-      "import": {
-        "@convex-dev/component-source": "./src/component/convex.config.ts",
-        "types": "./dist/esm/component/convex.config.d.ts",
-        "default": "./dist/esm/component/convex.config.js"
-      }
+      "types": "./dist/component/convex.config.d.ts",
+      "default": "./dist/component/convex.config.js"
     }
   },
   "peerDependencies": {
@@ -93,7 +72,7 @@
     "@blocknote/mantine": ">=0.31.0 <=1.0.0",
     "@blocknote/react": ">=0.31.0 <=1.0.0",
     "@tiptap/core": "^2.7.0",
-    "convex": ">=1.21.0 <1.35.0",
+    "convex": "^1.24.8",
     "react": "^18.3.1 || ^19.0.0",
     "react-dom": "^18.3.1 || ^19.0.0"
   },
@@ -126,7 +105,7 @@
     "@tiptap/extension-underline": "2.26.2",
     "@tiptap/react": "2.26.2",
     "@tiptap/starter-kit": "2.26.1",
-    "@types/node": "^22.18.13",
+    "@types/node": "^20.19.0",
     "@types/react": "19.2.2",
     "@types/react-dom": "19.2.2",
     "@vitejs/plugin-react": "5.0.4",
@@ -146,7 +125,6 @@
     "vite": "6.4.1",
     "vitest": "^3.2.4"
   },
-  "main": "./dist/commonjs/client/index.js",
-  "types": "./dist/commonjs/client/index.d.ts",
-  "module": "./dist/esm/client/index.js"
+  "types": "./dist/client/index.d.ts",
+  "module": "./dist/client/index.js"
 }

@@ -1,7 +1,5 @@
 import {
   ApiFromModules,
-  Expand,
-  FunctionReference,
   GenericDataModel,
   GenericMutationCtx,
   GenericQueryCtx,
@@ -9,7 +7,7 @@ import {
   queryGeneric,
 } from "convex/server";
 import { v, VString } from "convex/values";
-import { Mounts } from "../component/_generated/api.js";
+import { ComponentApi } from "../component/_generated/component.js";
 import { vClientId } from "../component/schema.js";
 import { Schema, Node } from "@tiptap/pm/model";
 import { Step, Transform } from "@tiptap/pm/transform";
@@ -42,7 +40,7 @@ export class ProsemirrorSync<Id extends string = string> {
    * @param component - Generally `components.prosemirrorSync` from
    * `./_generated/api` once you've configured it in `convex.config.ts`.
    */
-  constructor(public component: UseApi<Mounts>) {}
+  constructor(public component: ComponentApi) {}
   /**
    * Create a new document with the given ID and content.
    *
@@ -300,7 +298,7 @@ export class ProsemirrorSync<Id extends string = string> {
 
 async function getLatestVersion(
   ctx: RunMutationCtx,
-  component: UseApi<Mounts>,
+  component: ComponentApi,
   id: string,
   schema: Schema
 ) {
@@ -319,17 +317,3 @@ async function getLatestVersion(
   }
   return { transform, version };
 }
-
-/* Type utils follow */
-
-export type UseApi<API> = Expand<{
-  [mod in keyof API]: API[mod] extends FunctionReference<
-    infer FType,
-    "public",
-    infer FArgs,
-    infer FReturnType,
-    infer FComponentPath
-  >
-    ? FunctionReference<FType, "internal", FArgs, FReturnType, FComponentPath>
-    : UseApi<API[mod]>;
-}>;
