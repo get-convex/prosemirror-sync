@@ -113,7 +113,7 @@ export function syncExtension(
   opts?: UseSyncOptions
 ): AnyExtension {
   const log: typeof console.log = opts?.debug ? console.debug : () => {};
-  let snapshotTimer: number | undefined;
+  let snapshotTimer: NodeJS.Timeout | undefined;
   const trySubmitSnapshot = (version: number, content: string) => {
     if (snapshotTimer) {
       clearTimeout(snapshotTimer);
