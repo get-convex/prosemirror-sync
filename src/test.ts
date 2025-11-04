@@ -10,7 +10,7 @@ const modules = import.meta.glob("./component/**/*.ts");
  */
 export function register(
   t: TestConvex<SchemaDefinition<GenericSchema, boolean>>,
-  name: string = "prosemirrorSync"
+  name: string = "prosemirrorSync",
 ) {
   t.registerComponent(name, schema, modules);
 }

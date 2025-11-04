@@ -24,7 +24,7 @@ export const submitSnapshot = mutation({
     const existing = await ctx.db
       .query("snapshots")
       .withIndex("id_version", (q) =>
-        q.eq("id", args.id).eq("version", args.version)
+        q.eq("id", args.id).eq("version", args.version),
       )
       .first();
     if (existing) {
@@ -33,7 +33,7 @@ export const submitSnapshot = mutation({
       }
       throw new Error(
         `Snapshot ${args.id} at version ${args.version} already exists ` +
-          `with different content: ${existing.content} !== ${args.content}`
+          `with different content: ${existing.content} !== ${args.content}`,
       );
     }
     await ctx.db.insert("snapshots", {
@@ -86,13 +86,13 @@ export const submitSteps = mutation({
       clientIds: v.array(vClientId),
       steps: v.array(v.string()),
     }),
-    v.object({ status: v.literal("synced") })
+    v.object({ status: v.literal("synced") }),
   ),
   handler: async (ctx, args) => {
     const changes = await ctx.db
       .query("deltas")
       .withIndex("id_version", (q) =>
-        q.eq("id", args.id).gt("version", args.version)
+        q.eq("id", args.id).gt("version", args.version),
       )
       .take(MAX_DELTA_FETCH);
     if (changes.length > 0) {
@@ -130,13 +130,13 @@ export const getSnapshot = query({
     v.object({
       content: v.string(),
       version: v.number(),
-    })
+    }),
   ),
   handler: async (ctx, args) => {
     const snapshot = await ctx.db
       .query("snapshots")
       .withIndex("id_version", (q) =>
-        q.eq("id", args.id).lte("version", args.version ?? Infinity)
+        q.eq("id", args.id).lte("version", args.version ?? Infinity),
       )
       .order("desc")
       .first();
@@ -156,7 +156,7 @@ async function fetchSteps(
   ctx: QueryCtx,
   id: string,
   afterVersion: number,
-  targetVersion?: number
+  targetVersion?: number,
 ) {
   const deltas = await ctx.db
     .query("deltas")
@@ -164,7 +164,7 @@ async function fetchSteps(
       q
         .eq("id", id)
         .gt("version", afterVersion)
-        .lte("version", targetVersion ?? Infinity)
+        .lte("version", targetVersion ?? Infinity),
     )
     .take(MAX_DELTA_FETCH);
   if (deltas.length > 0) {
@@ -173,11 +173,11 @@ async function fetchSteps(
       throw new Error(
         `Missing steps ${afterVersion + 1}...${
           firstDelta.version - firstDelta.steps.length
-        }`
+        }`,
       );
     } else if (firstDelta.version - firstDelta.steps.length < afterVersion) {
       firstDelta.steps = firstDelta.steps.slice(
-        afterVersion - (firstDelta.version - firstDelta.steps.length)
+        afterVersion - (firstDelta.version - firstDelta.steps.length),
       );
     }
   }
@@ -186,7 +186,7 @@ async function fetchSteps(
     console.warn(
       `Max delta fetch reached: ${id} ${afterVersion}...${
         targetVersion ?? "end"
-      } stopped at ${deltas[deltas.length - 1].version}`
+      } stopped at ${deltas[deltas.length - 1].version}`,
     );
     return [steps, clientIds] as const;
   }
@@ -195,12 +195,12 @@ async function fetchSteps(
     const nextDelta = await ctx.db
       .query("deltas")
       .withIndex("id_version", (q) =>
-        q.eq("id", id).gt("version", lastDelta.version)
+        q.eq("id", id).gt("version", lastDelta.version),
       )
       .first();
     if (!nextDelta) {
       throw new Error(
-        `Missing steps ${lastDelta ? lastDelta.version + 1 : afterVersion}...${targetVersion}`
+        `Missing steps ${lastDelta ? lastDelta.version + 1 : afterVersion}...${targetVersion}`,
       );
     }
     for (let i = 0; i < targetVersion - lastDelta.version; i++) {
@@ -210,7 +210,7 @@ async function fetchSteps(
   }
   if (targetVersion && steps.length !== targetVersion - afterVersion) {
     throw new Error(
-      `Steps mismatch ${afterVersion}...${targetVersion}: ${steps.length}`
+      `Steps mismatch ${afterVersion}...${targetVersion}: ${steps.length}`,
     );
   }
   return [steps, clientIds] as const;
@@ -248,7 +248,7 @@ export const deleteSnapshots = mutation({
 
 async function deleteSnapshotsHelper(
   ctx: MutationCtx,
-  args: { id: string; afterVersion?: number; beforeVersion?: number }
+  args: { id: string; afterVersion?: number; beforeVersion?: number },
 ) {
   const versions = await ctx.db
     .query("snapshots")
@@ -304,7 +304,7 @@ export const deleteSteps = mutation({
       await ctx.db
         .query("deltas")
         .withIndex("id_version", (q) =>
-          q.eq("id", args.id).gt("version", args.afterVersion ?? -Infinity)
+          q.eq("id", args.id).gt("version", args.afterVersion ?? -Infinity),
         )
         .take(MAX_DELTA_FETCH)
     ).filter((doc) => doc._creationTime < beforeTs);

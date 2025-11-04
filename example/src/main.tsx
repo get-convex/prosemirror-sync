@@ -19,5 +19,5 @@ const id = window.location.hash.slice(1);
 createRoot(document.getElementById("root")!).render(
   <ConvexProvider client={convex}>
     <App id={id} />
-  </ConvexProvider>
+  </ConvexProvider>,
 );

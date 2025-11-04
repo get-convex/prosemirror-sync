@@ -72,7 +72,7 @@ export class ProsemirrorSync<Id extends string = string> {
       ctx,
       this.component,
       id,
-      schema
+      schema,
     );
     return {
       version,
@@ -112,9 +112,9 @@ export class ProsemirrorSync<Id extends string = string> {
     schema: Schema,
     fn: (
       node: Node,
-      version: number
+      version: number,
     ) => Transform | null | Promise<Transform | null>,
-    opts?: { clientId?: string }
+    opts?: { clientId?: string },
   ) {
     const { transform: serverVersion, version: initialVersion } =
       await getLatestVersion(ctx, this.component, id, schema);
@@ -180,7 +180,7 @@ export class ProsemirrorSync<Id extends string = string> {
      */
     checkRead?: (
       ctx: GenericQueryCtx<DataModel>,
-      id: Id
+      id: Id,
     ) => void | Promise<void>;
     /**
      * Optional callback to check write permissions.
@@ -190,7 +190,7 @@ export class ProsemirrorSync<Id extends string = string> {
      */
     checkWrite?: (
       ctx: GenericMutationCtx<DataModel>,
-      id: Id
+      id: Id,
     ) => void | Promise<void>;
     /**
      * Optional callback to run when a new snapshot is available.
@@ -204,7 +204,7 @@ export class ProsemirrorSync<Id extends string = string> {
       ctx: GenericMutationCtx<DataModel>,
       id: Id,
       snapshot: string,
-      version: number
+      version: number,
     ) => void | Promise<void>;
     /**
      * Whether to prune old snapshots.
@@ -227,7 +227,7 @@ export class ProsemirrorSync<Id extends string = string> {
           v.object({
             content: v.string(),
             version: v.number(),
-          })
+          }),
         ),
         handler: async (ctx, args) => {
           if (opts?.checkRead) {
@@ -300,7 +300,7 @@ async function getLatestVersion(
   ctx: RunMutationCtx,
   component: ComponentApi,
   id: string,
-  schema: Schema
+  schema: Schema,
 ) {
   const snapshot = await ctx.runQuery(component.lib.getSnapshot, { id });
   if (!snapshot.content) {

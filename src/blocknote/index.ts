@@ -54,7 +54,7 @@ export type BlockNoteSyncOptions<Editor = BlockNoteEditor> = UseSyncOptions & {
 export function useBlockNoteSync<Editor = BlockNoteEditor>(
   syncApi: SyncApi,
   id: string,
-  opts?: BlockNoteSyncOptions<Editor>
+  opts?: BlockNoteSyncOptions<Editor>,
 ):
   | {
       editor: null;
