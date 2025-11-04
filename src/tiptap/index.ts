@@ -1,5 +1,5 @@
 import {
-  ConvexReactClient,
+  type ConvexReactClient,
   useConvex,
   useMutation,
   useQuery,
@@ -30,7 +30,7 @@ export type UseSyncOptions = {
 export function useTiptapSync(
   syncApi: SyncApi,
   id: string,
-  opts?: UseSyncOptions
+  opts?: UseSyncOptions,
 ) {
   const log: typeof console.log = opts?.debug ? console.debug : () => {};
   const convex = useConvex();
@@ -42,7 +42,7 @@ export function useTiptapSync(
     // // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [convex, id, initial.loading, initial.initialContent]);
   const submitSnapshot = useMutation(
-    syncApi.submitSnapshot
+    syncApi.submitSnapshot,
   ).withOptimisticUpdate((localQueryStore, args) => {
     // This update will allow the useInitialState to respond immediately to
     // creating documents, as if it came from the server.
@@ -54,7 +54,7 @@ export function useTiptapSync(
         {
           version: args.version,
           content: args.content,
-        }
+        },
       );
     }
     const version = localQueryStore.getQuery(syncApi.latestVersion, { id });
@@ -71,7 +71,7 @@ export function useTiptapSync(
         content: JSON.stringify(content),
       });
     },
-    [convex, id]
+    [convex, id],
   );
   if (initial.loading) {
     return {
@@ -110,7 +110,7 @@ export function syncExtension(
   id: string,
   syncApi: SyncApi,
   initialState: InitialState,
-  opts?: UseSyncOptions
+  opts?: UseSyncOptions,
 ): AnyExtension {
   const log: typeof console.log = opts?.debug ? console.debug : () => {};
   let snapshotTimer: NodeJS.Timeout | undefined;
@@ -163,7 +163,7 @@ export function syncExtension(
           id,
           serverVersion,
           initialState,
-          opts?.debug
+          opts?.debug,
         )
       ) {
         const version = collab.getVersion(editor.state);
@@ -236,7 +236,7 @@ async function doSync(
   id: string,
   serverVersion: number | null,
   initialState: InitialState,
-  debug?: boolean
+  debug?: boolean,
 ) {
   const log: typeof console.log = debug ? console.debug : () => {};
   if (serverVersion === null) {
@@ -270,7 +270,7 @@ async function doSync(
     receiveSteps(
       editor,
       steps.steps.map((step) => Step.fromJSON(editor.schema, JSON.parse(step))),
-      steps.clientIds
+      steps.clientIds,
     );
   }
   let anyChanges = false;
@@ -295,7 +295,7 @@ async function doSync(
       receiveSteps(
         editor,
         steps.map((step) => Step.fromJSON(editor.schema, JSON.parse(step))),
-        steps.map(() => sendable.clientID)
+        steps.map(() => sendable.clientID),
       );
       log("Synced", {
         steps,
@@ -308,9 +308,9 @@ async function doSync(
       receiveSteps(
         editor,
         result.steps.map((step) =>
-          Step.fromJSON(editor.schema, JSON.parse(step))
+          Step.fromJSON(editor.schema, JSON.parse(step)),
         ),
-        result.clientIds
+        result.clientIds,
       );
       log("Rebased", {
         steps,
@@ -324,12 +324,12 @@ async function doSync(
 function receiveSteps(
   editor: Editor,
   steps: Step[],
-  clientIds: (string | number)[]
+  clientIds: (string | number)[],
 ) {
   editor.view.dispatch(
     collab.receiveTransaction(editor.state, steps, clientIds, {
       mapSelectionBackward: true,
-    })
+    }),
   );
 }
 
@@ -342,7 +342,7 @@ type InitialState = {
 export function useInitialState(
   syncApi: SyncApi,
   id: string,
-  cacheKeyPrefix?: string
+  cacheKeyPrefix?: string,
 ) {
   const serverRef = useRef<{
     id: string;
@@ -353,7 +353,7 @@ export function useInitialState(
   }, [id, cacheKeyPrefix]);
   const serverInitial = useQuery(
     syncApi.getSnapshot,
-    serverRef.current.snapshot && serverRef.current.id === id ? "skip" : { id }
+    serverRef.current.snapshot && serverRef.current.id === id ? "skip" : { id },
   );
   const snapshot = useMemo(() => {
     return (
@@ -391,7 +391,7 @@ export function useInitialState(
 
 function getCachedState(
   id: string,
-  cacheKeyPrefix?: string
+  cacheKeyPrefix?: string,
 ): InitialState | undefined {
   // TODO: Verify that this works
   const cacheKey = `${cacheKeyPrefix ?? "convex-sync"}-${id}`;
