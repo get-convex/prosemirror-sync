@@ -11,14 +11,16 @@
 import type { FunctionReference } from "convex/server";
 
 /**
- * A utility for referencing a Convex component's API.
+ * A utility for referencing a Convex component's exposed API.
  *
+ * Useful when expecting a parameter like `components.myComponent`.
  * Usage:
- * ```js
- * export type MyComponentApi = ComponentApi;
+ * ```ts
+ * async function myFunction(ctx: QueryCtx, component: ComponentApi) {
+ *   return ctx.runQuery(component.someFile.someQuery, { ...args });
+ * }
  * ```
  */
-
 export type ComponentApi<Name extends string | undefined = string | undefined> =
   {
     lib: {
