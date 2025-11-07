@@ -89,7 +89,7 @@ component by calling `use`:
 ```ts
 // convex/convex.config.ts
 import { defineApp } from "convex/server";
-import prosemirrorSync from "@convex-dev/prosemirror-sync/convex.config";
+import prosemirrorSync from "@convex-dev/prosemirror-sync/convex.config.js";
 
 const app = defineApp();
 app.use(prosemirrorSync);
