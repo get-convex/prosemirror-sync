@@ -116,6 +116,7 @@
     "@types/ws": "8.18.1",
     "@vitejs/plugin-react": "5.0.4",
     "chokidar-cli": "3.0.0",
+    "convex": "1.29.0",
     "convex-test": "0.0.38",
     "cpy-cli": "6.0.0",
     "eslint": "9.38.0",
