@@ -1,15 +1,13 @@
 import {
-  ApiFromModules,
-  Expand,
-  FunctionReference,
-  GenericDataModel,
-  GenericMutationCtx,
-  GenericQueryCtx,
+  type ApiFromModules,
+  type GenericDataModel,
+  type GenericMutationCtx,
+  type GenericQueryCtx,
   mutationGeneric,
   queryGeneric,
 } from "convex/server";
-import { v, VString } from "convex/values";
-import { Mounts } from "../component/_generated/api.js";
+import { v, type VString } from "convex/values";
+import type { ComponentApi } from "../component/_generated/component.js";
 import { vClientId } from "../component/schema.js";
 import { Schema, Node } from "@tiptap/pm/model";
 import { Step, Transform } from "@tiptap/pm/transform";
@@ -42,7 +40,7 @@ export class ProsemirrorSync<Id extends string = string> {
    * @param component - Generally `components.prosemirrorSync` from
    * `./_generated/api` once you've configured it in `convex.config.ts`.
    */
-  constructor(public component: UseApi<Mounts>) {}
+  constructor(public component: ComponentApi) {}
   /**
    * Create a new document with the given ID and content.
    *
@@ -74,7 +72,7 @@ export class ProsemirrorSync<Id extends string = string> {
       ctx,
       this.component,
       id,
-      schema
+      schema,
     );
     return {
       version,
@@ -114,9 +112,9 @@ export class ProsemirrorSync<Id extends string = string> {
     schema: Schema,
     fn: (
       node: Node,
-      version: number
+      version: number,
     ) => Transform | null | Promise<Transform | null>,
-    opts?: { clientId?: string }
+    opts?: { clientId?: string },
   ) {
     const { transform: serverVersion, version: initialVersion } =
       await getLatestVersion(ctx, this.component, id, schema);
@@ -182,7 +180,7 @@ export class ProsemirrorSync<Id extends string = string> {
      */
     checkRead?: (
       ctx: GenericQueryCtx<DataModel>,
-      id: Id
+      id: Id,
     ) => void | Promise<void>;
     /**
      * Optional callback to check write permissions.
@@ -192,7 +190,7 @@ export class ProsemirrorSync<Id extends string = string> {
      */
     checkWrite?: (
       ctx: GenericMutationCtx<DataModel>,
-      id: Id
+      id: Id,
     ) => void | Promise<void>;
     /**
      * Optional callback to run when a new snapshot is available.
@@ -206,7 +204,7 @@ export class ProsemirrorSync<Id extends string = string> {
       ctx: GenericMutationCtx<DataModel>,
       id: Id,
       snapshot: string,
-      version: number
+      version: number,
     ) => void | Promise<void>;
     /**
      * Whether to prune old snapshots.
@@ -229,7 +227,7 @@ export class ProsemirrorSync<Id extends string = string> {
           v.object({
             content: v.string(),
             version: v.number(),
-          })
+          }),
         ),
         handler: async (ctx, args) => {
           if (opts?.checkRead) {
@@ -300,9 +298,9 @@ export class ProsemirrorSync<Id extends string = string> {
 
 async function getLatestVersion(
   ctx: RunMutationCtx,
-  component: UseApi<Mounts>,
+  component: ComponentApi,
   id: string,
-  schema: Schema
+  schema: Schema,
 ) {
   const snapshot = await ctx.runQuery(component.lib.getSnapshot, { id });
   if (!snapshot.content) {
@@ -319,17 +317,3 @@ async function getLatestVersion(
   }
   return { transform, version };
 }
-
-/* Type utils follow */
-
-export type UseApi<API> = Expand<{
-  [mod in keyof API]: API[mod] extends FunctionReference<
-    infer FType,
-    "public",
-    infer FArgs,
-    infer FReturnType,
-    infer FComponentPath
-  >
-    ? FunctionReference<FType, "internal", FArgs, FReturnType, FComponentPath>
-    : UseApi<API[mod]>;
-}>;

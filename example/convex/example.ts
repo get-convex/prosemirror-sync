@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { v } from "convex/values";
 import { components, internal } from "./_generated/api";
 import { action, internalMutation, mutation } from "./_generated/server";
@@ -103,7 +104,7 @@ export const manualTransform = mutation({
       components.prosemirrorSync.lib.getSnapshot,
       {
         id,
-      }
+      },
     );
     if (!snapshot.content) {
       throw new Error("Document not found");
@@ -113,7 +114,7 @@ export const manualTransform = mutation({
     const serverVersion = new Transform(schema.nodeFromJSON(content));
     const stepsResult = await ctx.runQuery(
       components.prosemirrorSync.lib.getSteps,
-      { id, version: snapshot.version }
+      { id, version: snapshot.version },
     );
     if (stepsResult.steps.length > 0) {
       for (const step of stepsResult.steps) {
@@ -132,7 +133,7 @@ export const manualTransform = mutation({
           clientId: "server function",
           version,
           steps: tr.steps.map((step) => JSON.stringify(step.toJSON())),
-        }
+        },
       );
       if (result.status === "synced") {
         await ctx.runMutation(components.prosemirrorSync.lib.submitSnapshot, {

@@ -2,30 +2,19 @@
 
 ## Running locally
 
-Setup:
-
 ```sh
 npm i
-cd example
-npm i
-npm run dev:convex -- --once
-```
-
-Run the frontend and backend:
-
-```sh
 npm run dev
 ```
 
 ## Testing
 
 ```sh
-rm -rf dist/ && npm run build
+npm run clean
+npm run build
 npm run typecheck
-npm run test
-cd example
 npm run lint
-cd ..
+npm run test
 ```
 
 ## Deploying
@@ -33,26 +22,19 @@ cd ..
 ### Building a one-off package
 
 ```sh
-rm -rf dist/ && npm run build
+npm run clean
+npm ci
 npm pack
 ```
 
 ### Deploying a new version
 
 ```sh
-# this will change the version and commit it (if you run it in the root directory)
-npm version patch
-npm publish --dry-run
-# sanity check files being included
-npm publish
-git push --tags
+npm run release
 ```
 
-#### Alpha release
-
-The same as above, but it requires extra flags so the release is only installed with `@alpha`:
+or for alpha release:
 
 ```sh
-npm version prerelease --preid alpha
-npm publish --tag alpha
+npm run alpha
 ```

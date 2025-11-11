@@ -1,6 +1,6 @@
 import { createRoot } from "react-dom/client";
 import { ConvexProvider, ConvexReactClient } from "convex/react";
-import App from "./App.tsx";
+import App from "./App.jsx";
 import "./index.css";
 
 const address = import.meta.env.VITE_CONVEX_URL;
@@ -19,5 +19,5 @@ const id = window.location.hash.slice(1);
 createRoot(document.getElementById("root")!).render(
   <ConvexProvider client={convex}>
     <App id={id} />
-  </ConvexProvider>
+  </ConvexProvider>,
 );

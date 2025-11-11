@@ -15,8 +15,9 @@ synced to the cloud. The data lives in your Convex database, and can be stored
 alongside the rest of your app's data.
 
 Just configure your editor features, add this component to your Convex backend,
-and use the provided sync React hook.
-Read this [Stack post](https://stack.convex.dev/add-a-collaborative-document-editor-to-your-app) for more details.
+and use the provided sync React hook. Read this
+[Stack post](https://stack.convex.dev/add-a-collaborative-document-editor-to-your-app)
+for more details.
 
 [![Example of editing](./blocknote.gif)](http://www.youtube.com/watch?v=TGd-Nl7PBYQ "Collaborative editing syncing")
 
@@ -62,16 +63,17 @@ Features:
 - Transform the document server-side, enabling easy AI interoperation.
 
 See [below](#future-features) for future feature ideas and
-[CONTRIBUTING.md](./CONTRIBUTING.md) for how to contribute.
-Found a bug? Feature request? [File it here](https://github.com/get-convex/prosemirror-sync/issues).
+[CONTRIBUTING.md](./CONTRIBUTING.md) for how to contribute. Found a bug? Feature
+request? [File it here](https://github.com/get-convex/prosemirror-sync/issues).
 
 ## Pre-requisite: Convex
 
-You'll need an existing Convex project to use the component.
-Convex is a hosted backend platform, including a database, serverless functions,
-and a ton more you can learn about [here](https://docs.convex.dev/get-started).
+You'll need an existing Convex project to use the component. Convex is a hosted
+backend platform, including a database, serverless functions, and a ton more you
+can learn about [here](https://docs.convex.dev/get-started).
 
-Run `npm create convex` or follow any of the [quickstarts](https://docs.convex.dev/home) to set one up.
+Run `npm create convex` or follow any of the
+[quickstarts](https://docs.convex.dev/home) to set one up.
 
 ## Installation
 
@@ -81,12 +83,13 @@ Install the component package:
 npm install @convex-dev/prosemirror-sync
 ```
 
-Create a `convex.config.ts` file in your app's `convex/` folder and install the component by calling `use`:
+Create a `convex.config.ts` file in your app's `convex/` folder and install the
+component by calling `use`:
 
 ```ts
 // convex/convex.config.ts
 import { defineApp } from "convex/server";
-import prosemirrorSync from "@convex-dev/prosemirror-sync/convex.config";
+import prosemirrorSync from "@convex-dev/prosemirror-sync/convex.config.js";
 
 const app = defineApp();
 app.use(prosemirrorSync);
@@ -97,9 +100,8 @@ export default app;
 ## Usage
 
 To use the component, you expose the API in a file in your `convex/` folder, and
-use the editor-specific sync React hook, passing in a reference to
-the API you defined. For this example, we'll create the API in
-`convex/example.ts`.
+use the editor-specific sync React hook, passing in a reference to the API you
+defined. For this example, we'll create the API in `convex/example.ts`.
 
 ```ts
 // convex/example.ts
@@ -194,21 +196,22 @@ See a working example in [example.ts](./example/convex/example.ts) and
 
 ### Configuring the snapshot debounce interval
 
-The snapshot debounce interval is set to one second by default.
-You can specify a different interval with the `snapshotDebounceMs` option when
-calling `useTiptapSync` or `useBlockNoteSync`.
+The snapshot debounce interval is set to one second by default. You can specify
+a different interval with the `snapshotDebounceMs` option when calling
+`useTiptapSync` or `useBlockNoteSync`.
 
 A snapshot won't be sent until both of these are true:
 
 - The document has been idle for the debounce interval.
 - The current user was the last to make a change.
 
-There can be races, but since each client will submit the snapshot for their
-own change, they won't conflict with each other and are safe to apply.
+There can be races, but since each client will submit the snapshot for their own
+change, they won't conflict with each other and are safe to apply.
 
 ### Creating a new document
 
-You can create a new document from the client by calling `sync.create(content)`, or on the server by calling `prosemirrorSync.create(ctx, id, content)`.
+You can create a new document from the client by calling `sync.create(content)`,
+or on the server by calling `prosemirrorSync.create(ctx, id, content)`.
 
 The content should be a JSON object matching the
 [Schema](https://tiptap.dev/docs/editor/core-concepts/schema). If you're using
@@ -229,8 +232,8 @@ For client-side document creation:
 
 ### Transforming the document server-side
 
-You can transform the document server-side. It will give you the latest
-version of the document, and you return a
+You can transform the document server-side. It will give you the latest version
+of the document, and you return a
 [ProseMirror Transform](https://prosemirror.net/docs/ref/#transform.Transform).
 
 You can make this transoform via `new Transform(doc)` or, if you are hydrating a
@@ -260,11 +263,11 @@ export const transformExample = action({
 
 - The `extensions` should be the same as the ones used by your client editor,
   for any extensions that affect the schema (not the sync extension).
-- The `transform` function can be called multiple times if the document is
-  being modified concurrently. Ideally this callback doesn't do any slow
-  operations internally. Instead, do them beforehand.
-- The `doc` may differ from the one returned from `getDoc`. You can compare
-  the `version` returned from `getDoc` to the second argument to the `transform`
+- The `transform` function can be called multiple times if the document is being
+  modified concurrently. Ideally this callback doesn't do any slow operations
+  internally. Instead, do them beforehand.
+- The `doc` may differ from the one returned from `getDoc`. You can compare the
+  `version` returned from `getDoc` to the second argument to the `transform`
   function to see if the document has changed.
 - The `transform` function can return a null value to abort making changes.
 - If you're passing along a position to insert the text, be aware that changes
@@ -300,9 +303,9 @@ Features that could be added later:
 
 - Offline editing support: cache the document and local changes in
   `sessionStorage` and sync when back online (only for active browser tab).
-  - Also save snapshots (but not local edits) to `localStorage` so new tabs
-    can see and edit documents offline (but won't see edits from other tabs
-    until they're back online).
+  - Also save snapshots (but not local edits) to `localStorage` so new tabs can
+    see and edit documents offline (but won't see edits from other tabs until
+    they're back online).
 - Configuration for debouncing syncing steps (to reduce function calls).
 - Option to write the concrete value each time a delta is submitted.
 - Pluggable storage for ReactNative, assuming single-session.
@@ -329,9 +332,9 @@ Missing features that aren't currently planned:
 - Callback to confirm rebases and handle failures in the client (during sync).
 - Optimization to sync a snapshot instead of many deltas when an old client
   reconnects and doesn't have local changes.
-- Handling multiple AsyncStorage instances that are restored from the same
-  cloud backup, leading to multiple clients with the same clientID. For now,
-  we'll assume that AsyncStorage is only used by one client at a time.
+- Handling multiple AsyncStorage instances that are restored from the same cloud
+  backup, leading to multiple clients with the same clientID. For now, we'll
+  assume that AsyncStorage is only used by one client at a time.
 
 <!-- END: Include on https://convex.dev/components -->
 

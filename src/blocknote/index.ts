@@ -7,7 +7,7 @@ import {
   type BlockNoteEditorOptions,
   nodeToBlock,
 } from "@blocknote/core";
-import { JSONContent } from "@tiptap/core";
+import type { JSONContent } from "@tiptap/core";
 
 export type BlockNoteSyncOptions<Editor = BlockNoteEditor> = UseSyncOptions & {
   /**
@@ -15,7 +15,6 @@ export type BlockNoteSyncOptions<Editor = BlockNoteEditor> = UseSyncOptions & {
    * the initialContent is parsed with the correct schema.
    */
   editorOptions?: Partial<
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     Omit<BlockNoteEditorOptions<any, any, any>, "initialContent">
   >;
   /**
@@ -55,7 +54,7 @@ export type BlockNoteSyncOptions<Editor = BlockNoteEditor> = UseSyncOptions & {
 export function useBlockNoteSync<Editor = BlockNoteEditor>(
   syncApi: SyncApi,
   id: string,
-  opts?: BlockNoteSyncOptions<Editor>
+  opts?: BlockNoteSyncOptions<Editor>,
 ):
   | {
       editor: null;
@@ -78,7 +77,6 @@ export function useBlockNoteSync<Editor = BlockNoteEditor>(
       ...opts?.editorOptions,
       _headless: true,
     });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const blocks: Block<any, any, any>[] = [];
 
     // Convert the prosemirror document to BlockNote blocks.

@@ -32,7 +32,7 @@ describe("prosemirror lib", () => {
         clientId,
         version: 0,
         steps: ["a"],
-      })
+      }),
     ).toEqual({
       status: "needs-rebase",
       clientIds: [clientId, clientId],
@@ -56,7 +56,7 @@ describe("prosemirror lib", () => {
         clientId,
         version: 0,
         steps: ["a", "b"],
-      })
+      }),
     ).toEqual({ status: "synced" });
     const { steps, clientIds, version } = await t.query(api.lib.getSteps, {
       id,
@@ -238,7 +238,7 @@ describe("prosemirror lib", () => {
         id,
         version: 0,
         content: "other content",
-      })
+      }),
     ).rejects.toThrow();
   });
   test("submitSnapshot deletes older snapshot", async () => {
@@ -274,7 +274,7 @@ describe("prosemirror lib", () => {
       {
         id,
         version: 2,
-      }
+      },
     );
     expect(content2).toEqual("content");
     expect(version2).toEqual(1);
