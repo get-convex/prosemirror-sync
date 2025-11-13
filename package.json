@@ -113,6 +113,7 @@
     "@types/react-dom": "19.2.2",
     "@types/ws": "8.18.1",
     "@vitejs/plugin-react": "5.0.4",
+    "decode-named-character-reference": "https://github.com/ianmacartney/decode-named-character-reference/releases/download/1.2.0-convex/decode-named-character-reference-1.2.0.tgz",
     "chokidar-cli": "3.0.0",
     "convex": "1.29.0",
     "convex-test": "0.0.38",
