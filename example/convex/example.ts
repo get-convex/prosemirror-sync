@@ -34,8 +34,9 @@ export const {
     let schema: Schema;
     // A hack for our demo which uses both BlockNote and Tiptap.
     if (id.endsWith("-blocknote")) {
-      // Parse the snapshot from BlockNote.
-      const editor = BlockNoteEditor.create({ _headless: true });
+      // Parse the snapshot from BlockNote in the Convex runtime.
+      // ServerBlockNoteEditor only works in "use node" in the Convex runtime.
+      const editor = BlockNoteEditor.create();
       schema = editor.pmSchema;
     } else {
       // Fetching the content from Tiptap, using your extensions.
