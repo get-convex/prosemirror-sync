@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.1
+
+- Updates support for tiptap/core v3 by pinning a dependency to not expect a dom
+  in a convex function environment. If you see issues with
+  decode-named-character-reference, make sure you've updated it to ^1.3.0.
+
 ## 0.2.0
 
 - Adds /test and /\_generated/component.js entrypoints
