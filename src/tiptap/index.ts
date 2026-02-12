@@ -393,6 +393,9 @@ function getCachedState(
   id: string,
   cacheKeyPrefix?: string,
 ): InitialState | undefined {
+  if (typeof window === "undefined") {
+    return undefined;
+  }
   // TODO: Verify that this works
   const cacheKey = `${cacheKeyPrefix ?? "convex-sync"}-${id}`;
   const cache = sessionStorage.getItem(cacheKey);
