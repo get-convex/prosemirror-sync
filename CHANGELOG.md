@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.2
+
+- Fix a crash during server rendering (thanks @vcapretz!)
+
 ## 0.2.1
 
 - Updates support for tiptap/core v3 by pinning a dependency to not expect a dom
