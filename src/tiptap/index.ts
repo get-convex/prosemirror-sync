@@ -25,6 +25,13 @@ export type UseSyncOptions = {
   onSyncError?: (error: Error) => void;
   snapshotDebounceMs?: number;
   debug?: boolean;
+  /**
+   * Whether to show a browser warning when closing the tab with unsynced
+   * changes. This prevents accidental data loss when the user has local
+   * edits that haven't been sent to the server yet.
+   * @default true
+   */
+  warnOnUnsyncedClose?: boolean;
 };
 
 export function useTiptapSync(
@@ -190,12 +197,17 @@ export function syncExtension(
   }
 
   let unsubscribe: (() => void) | undefined;
+  let beforeUnloadHandler: ((e: BeforeUnloadEvent) => void) | undefined;
 
   return Extension.create({
     name: "convex-sync",
     onDestroy() {
       log("destroying");
       unsubscribe?.();
+      if (beforeUnloadHandler) {
+        window.removeEventListener("beforeunload", beforeUnloadHandler);
+        beforeUnloadHandler = undefined;
+      }
     },
     onCreate() {
       if (initialState.restoredSteps?.length) {
@@ -212,6 +224,18 @@ export function syncExtension(
         void trySync(this.editor);
       });
       void trySync(this.editor);
+      // Install beforeunload handler if not explicitly disabled.
+      if (opts?.warnOnUnsyncedClose !== false && typeof window !== "undefined") {
+        const editor = this.editor;
+        beforeUnloadHandler = (e: BeforeUnloadEvent) => {
+          if (collab.sendableSteps(editor.state)) {
+            e.preventDefault();
+            // Required for older browsers.
+            e.returnValue = "";
+          }
+        };
+        window.addEventListener("beforeunload", beforeUnloadHandler);
+      }
     },
     onUpdate() {
       void trySync(this.editor);
