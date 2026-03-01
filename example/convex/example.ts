@@ -26,6 +26,10 @@ export const {
     // const user = await userFromAuth(ctx);
     // ...validate that the user can write to this document
   },
+  // getAuthorId(ctx) {
+  //   const user = await userFromAuth(ctx);
+  //   return user?._id;
+  // },
   async onSnapshot(ctx, id, snapshot, version) {
     // ...do something with the snapshot, like store a copy in another table,
     // save a text version of the document for text search, or generate

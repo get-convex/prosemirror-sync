@@ -114,7 +114,7 @@ export class ProsemirrorSync<Id extends string = string> {
       node: Node,
       version: number,
     ) => Transform | null | Promise<Transform | null>,
-    opts?: { clientId?: string },
+    opts?: { clientId?: string; authorId?: string },
   ) {
     const { transform: serverVersion, version: initialVersion } =
       await getLatestVersion(ctx, this.component, id, schema);
@@ -127,6 +127,7 @@ export class ProsemirrorSync<Id extends string = string> {
         version,
         clientId: opts?.clientId ?? "transform",
         steps: tr.steps.map((step) => JSON.stringify(step.toJSON())),
+        ...(opts?.authorId !== undefined ? { authorId: opts.authorId } : {}),
       });
       if (result.status === "synced") {
         await ctx.runMutation(this.component.lib.submitSnapshot, {
@@ -212,6 +213,15 @@ export class ProsemirrorSync<Id extends string = string> {
      * @default true
      */
     pruneSnapshots?: boolean;
+    /**
+     * Optional callback to get the author ID for change attribution.
+     * Called on each submitSteps to derive the author from server context
+     * (e.g. from auth). Return undefined to skip storing an author.
+     * @param ctx - A Convex mutation context.
+     */
+    getAuthorId?: (
+      ctx: GenericMutationCtx<DataModel>,
+    ) => string | undefined | Promise<string | undefined>;
   }) {
     const id = v.string() as VString<Id>;
     return {
@@ -289,7 +299,13 @@ export class ProsemirrorSync<Id extends string = string> {
           if (opts?.checkWrite) {
             await opts.checkWrite(ctx, args.id);
           }
-          return ctx.runMutation(this.component.lib.submitSteps, args);
+          const authorId = opts?.getAuthorId
+            ? await opts.getAuthorId(ctx)
+            : undefined;
+          return ctx.runMutation(this.component.lib.submitSteps, {
+            ...args,
+            ...(authorId !== undefined ? { authorId } : {}),
+          });
         },
       }),
     };

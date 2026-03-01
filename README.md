@@ -62,6 +62,7 @@ Features:
 - Deletion API for old snapshots & steps.
 - Transform the document server-side, enabling easy AI interoperation.
 - Warning when closing a tab with unsynced changes (enabled by default).
+- Optional `authorId` on deltas to track who made which changes.
 
 See [below](#future-features) for future feature ideas and
 [CONTRIBUTING.md](./CONTRIBUTING.md) for how to contribute. Found a bug? Feature
@@ -221,6 +222,36 @@ const sync = useTiptapSync(api.example, "some-id", {
 });
 ```
 
+### Tracking change authorship
+
+You can optionally track who authored each set of changes by providing a
+`getAuthorId` callback in the `syncApi` options. This is called server-side on
+each `submitSteps`, so the value is derived from your auth context and can be
+trusted:
+
+```ts
+const prosemirrorSync = new ProsemirrorSync(components.prosemirrorSync);
+export const { ... } = prosemirrorSync.syncApi({
+  getAuthorId: async (ctx) => {
+    const user = await getAuthUserId(ctx);
+    return user ?? undefined;
+  },
+});
+```
+
+For server-side transforms, you can pass `authorId` directly since the caller is
+already trusted:
+
+```ts
+await prosemirrorSync.transform(ctx, id, schema, transformFn, {
+  authorId: "system",
+});
+```
+
+When fetching steps via `getSteps`, the response includes an `authorIds` array
+alongside `steps` and `clientIds`. Deltas submitted without an author will have
+`null` in this array.
+
 ### Creating a new document
 
 You can create a new document from the client by calling `sync.create(content)`,
@@ -331,7 +362,6 @@ Features that could be added later:
   IDs as their document IDs. This is available on the server but not browser.
 - Drop clientIds entirely and just use two UUIDs locally to differentiate our
   changes from server-applied changes.
-- Add an optional authorId to the data model to track who made which changes.
 
 Missing features that aren't currently planned:
 
