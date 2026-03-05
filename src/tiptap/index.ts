@@ -205,7 +205,7 @@ export function syncExtension(
       log("destroying");
       unsubscribe?.();
       if (beforeUnloadHandler) {
-        window.removeEventListener("beforeunload", beforeUnloadHandler);
+        window.removeEventListener?.("beforeunload", beforeUnloadHandler);
         beforeUnloadHandler = undefined;
       }
     },
@@ -225,7 +225,7 @@ export function syncExtension(
       });
       void trySync(this.editor);
       // Install beforeunload handler if not explicitly disabled.
-      if (opts?.warnOnUnsyncedClose !== false && typeof window !== "undefined") {
+      if (opts?.warnOnUnsyncedClose !== false && typeof window !== "undefined" && typeof window.addEventListener === "function") {
         const editor = this.editor;
         beforeUnloadHandler = (e: BeforeUnloadEvent) => {
           if (collab.sendableSteps(editor.state)) {
