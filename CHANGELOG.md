@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.3
+
+- warn on closing tab with unsynced changes (credit: bxff)
+
 ## 0.2.2
 
 - Fix a crash during server rendering (thanks @vcapretz!)
