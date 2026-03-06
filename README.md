@@ -61,6 +61,7 @@ Features:
 - Debounced snapshots allow new clients to avoid reading the full history.
 - Deletion API for old snapshots & steps.
 - Transform the document server-side, enabling easy AI interoperation.
+- Warning when closing a tab with unsynced changes (enabled by default).
 
 See [below](#future-features) for future feature ideas and
 [CONTRIBUTING.md](./CONTRIBUTING.md) for how to contribute. Found a bug? Feature
@@ -208,6 +209,18 @@ A snapshot won't be sent until both of these are true:
 There can be races, but since each client will submit the snapshot for their own
 change, they won't conflict with each other and are safe to apply.
 
+### Unsynced changes warning
+
+By default, the sync extension shows a browser confirmation dialog when the user
+tries to close a tab with local changes that haven't been sent to the server.
+This can be disabled:
+
+```ts
+const sync = useTiptapSync(api.example, "some-id", {
+  warnOnUnsyncedClose: false,
+});
+```
+
 ### Creating a new document
 
 You can create a new document from the client by calling `sync.create(content)`,
@@ -309,7 +322,6 @@ Features that could be added later:
 - Configuration for debouncing syncing steps (to reduce function calls).
 - Option to write the concrete value each time a delta is submitted.
 - Pluggable storage for ReactNative, assuming single-session.
-- Warning when closing tab with unsynced changes (works by default?).
 - Convert it to a ProseMirror plugin instead of a Tiptap extension, so raw
   ProseMirror usecases can also use it.
 - Handling edge cases, such as old clients with local changes on top of an older
