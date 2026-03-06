@@ -248,9 +248,25 @@ await prosemirrorSync.transform(ctx, id, schema, transformFn, {
 });
 ```
 
-When fetching steps via `getSteps`, the response includes an `authorIds` array
-alongside `steps` and `clientIds`. Deltas submitted without an author will have
-`null` in this array.
+#### Consuming author data
+
+**Server-side**: Query `getSteps` directly to access `authorIds` alongside
+`steps` and `clientIds`.
+
+**Client-side**: Use the `onStepsReceived` callback to access author info as
+steps arrive:
+
+```tsx
+const sync = useTiptapSync(api.example, "some-id", {
+  onStepsReceived: ({ steps, clientIds, authorIds, version }) => {
+    // authorIds is present only when at least one delta has an author.
+    // Build change history, "last edited by", etc.
+  },
+});
+```
+
+When no `getAuthorId` callback is configured (or no deltas have authors),
+`authorIds` is omitted from responses entirely to keep the default case clean.
 
 ### Creating a new document
 
