@@ -32,6 +32,16 @@ export type UseSyncOptions = {
    * @default true
    */
   warnOnUnsyncedClose?: boolean;
+  /**
+   * Optional callback fired when steps are received from the server.
+   * Use this to access `authorIds` for change attribution on the client.
+   */
+  onStepsReceived?: (info: {
+    steps: object[];
+    clientIds: (string | number)[];
+    authorIds?: (string | null)[];
+    version: number;
+  }) => void;
 };
 
 export function useTiptapSync(
@@ -170,7 +180,7 @@ export function syncExtension(
           id,
           serverVersion,
           initialState,
-          opts?.debug,
+          opts,
         )
       ) {
         const version = collab.getVersion(editor.state);
@@ -260,9 +270,9 @@ async function doSync(
   id: string,
   serverVersion: number | null,
   initialState: InitialState,
-  debug?: boolean,
+  opts?: UseSyncOptions,
 ) {
-  const log: typeof console.log = debug ? console.debug : () => {};
+  const log: typeof console.log = opts?.debug ? console.debug : () => {};
   if (serverVersion === null) {
     if (initialState.initialVersion <= 1) {
       // This is a new document, so we can create it on the server.
@@ -287,14 +297,23 @@ async function doSync(
       version,
       serverVersion,
     });
-    const steps = await convex.query(syncApi.getSteps, {
+    const stepsResult = await convex.query(syncApi.getSteps, {
       id,
       version,
     });
+    const parsedSteps = stepsResult.steps.map((s) => JSON.parse(s) as object);
+    if (opts?.onStepsReceived) {
+      opts.onStepsReceived({
+        steps: parsedSteps,
+        clientIds: stepsResult.clientIds,
+        authorIds: stepsResult.authorIds,
+        version: version + stepsResult.steps.length,
+      });
+    }
     receiveSteps(
       editor,
-      steps.steps.map((step) => Step.fromJSON(editor.schema, JSON.parse(step))),
-      steps.clientIds,
+      parsedSteps.map((step) => Step.fromJSON(editor.schema, step)),
+      stepsResult.clientIds,
     );
   }
   let anyChanges = false;
@@ -329,10 +348,21 @@ async function doSync(
       continue;
     }
     if (result.status === "needs-rebase") {
+      const parsedRebaseSteps = result.steps.map(
+        (s) => JSON.parse(s) as object,
+      );
+      if (opts?.onStepsReceived) {
+        opts.onStepsReceived({
+          steps: parsedRebaseSteps,
+          clientIds: result.clientIds,
+          authorIds: result.authorIds,
+          version: collab.getVersion(editor.state) + result.steps.length,
+        });
+      }
       receiveSteps(
         editor,
-        result.steps.map((step) =>
-          Step.fromJSON(editor.schema, JSON.parse(step)),
+        parsedRebaseSteps.map((step) =>
+          Step.fromJSON(editor.schema, step),
         ),
         result.clientIds,
       );
