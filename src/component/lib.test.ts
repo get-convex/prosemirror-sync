@@ -58,10 +58,13 @@ describe("prosemirror lib", () => {
         steps: ["a", "b"],
       }),
     ).toEqual({ status: "synced" });
-    const { steps, clientIds, version } = await t.query(api.lib.getSteps, {
-      id,
-      version: 0,
-    });
+    const { steps, clientIds, version } = await t.query(
+      api.lib.getSteps,
+      {
+        id,
+        version: 0,
+      },
+    );
     expect(steps).toEqual(["a", "b"]);
     expect(clientIds).toEqual([clientId, clientId]);
     expect(version).toEqual(2);
@@ -85,10 +88,13 @@ describe("prosemirror lib", () => {
         steps: ["3"],
       });
     });
-    const { steps, clientIds, version } = await t.query(api.lib.getSteps, {
-      id,
-      version: 1,
-    });
+    const { steps, clientIds, version } = await t.query(
+      api.lib.getSteps,
+      {
+        id,
+        version: 1,
+      },
+    );
     expect(steps).toEqual(["2", "3"]);
     expect(clientIds).toEqual([clientId, clientId2]);
     expect(version).toEqual(3);
@@ -278,5 +284,89 @@ describe("prosemirror lib", () => {
     );
     expect(content2).toEqual("content");
     expect(version2).toEqual(1);
+  });
+  test("submitSteps with authorId tracks author", async () => {
+    const t = convexTest(schema, modules);
+    const id = crypto.randomUUID();
+    const clientId = "client1";
+    await t.run(async (ctx) => {
+      await ctx.db.insert("snapshots", {
+        id,
+        version: 0,
+        content: "",
+      });
+    });
+    await t.mutation(api.lib.submitSteps, {
+      id,
+      clientId,
+      version: 0,
+      steps: ["a", "b"],
+      authorId: "user-123",
+    });
+    const { steps, clientIds, authorIds, version } = await t.query(
+      api.lib.getSteps,
+      {
+        id,
+        version: 0,
+      },
+    );
+    expect(steps).toEqual(["a", "b"]);
+    expect(clientIds).toEqual([clientId, clientId]);
+    expect(authorIds).toEqual(["user-123", "user-123"]);
+    expect(version).toEqual(2);
+  });
+  test("submitSteps without authorId omits authorIds", async () => {
+    const t = convexTest(schema, modules);
+    const id = crypto.randomUUID();
+    const clientId = "client1";
+    await t.run(async (ctx) => {
+      await ctx.db.insert("snapshots", {
+        id,
+        version: 0,
+        content: "",
+      });
+    });
+    await t.mutation(api.lib.submitSteps, {
+      id,
+      clientId,
+      version: 0,
+      steps: ["a"],
+    });
+    const result = await t.query(api.lib.getSteps, {
+      id,
+      version: 0,
+    });
+    expect(result.authorIds).toBeUndefined();
+  });
+  test("submitSteps needs-rebase with authorId includes authorIds", async () => {
+    const t = convexTest(schema, modules);
+    const id = crypto.randomUUID();
+    const clientId = "client1";
+    await t.run(async (ctx) => {
+      await ctx.db.insert("snapshots", {
+        id,
+        version: 0,
+        content: "",
+      });
+      await ctx.db.insert("deltas", {
+        id,
+        version: 2,
+        clientId,
+        steps: ["1", "2"],
+        authorId: "user-456",
+      });
+    });
+    const result = await t.mutation(api.lib.submitSteps, {
+      id,
+      clientId: "client2",
+      version: 0,
+      steps: ["a"],
+    });
+    expect(result).toEqual({
+      status: "needs-rebase",
+      clientIds: [clientId, clientId],
+      steps: ["1", "2"],
+      authorIds: ["user-456", "user-456"],
+    });
   });
 });
