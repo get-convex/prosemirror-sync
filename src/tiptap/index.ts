@@ -12,7 +12,7 @@ import {
   Extension,
   type JSONContent,
 } from "@tiptap/core";
-import * as collab from "@tiptap/pm/collab";
+import * as collab from "prosemirror-collab";
 import { Step } from "@tiptap/pm/transform";
 import { useCallback, useMemo, useRef } from "react";
 import type { SyncApi } from "../client/index.js";
