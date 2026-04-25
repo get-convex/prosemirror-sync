@@ -265,7 +265,7 @@ async function deleteSnapshotsHelper(
       return before;
     })
     .take(MAX_SNAPSHOT_FETCH);
-  await Promise.all(versions.map((doc) => ctx.db.delete(doc._id)));
+  await Promise.all(versions.map((doc) => ctx.db.delete("snapshots", doc._id)));
   if (versions.length === MAX_SNAPSHOT_FETCH) {
     await ctx.scheduler.runAfter(0, api.lib.deleteSnapshots, {
       id: args.id,
@@ -308,7 +308,7 @@ export const deleteSteps = mutation({
         )
         .take(MAX_DELTA_FETCH)
     ).filter((doc) => doc._creationTime < beforeTs);
-    await Promise.all(deltas.map((doc) => ctx.db.delete(doc._id)));
+    await Promise.all(deltas.map((doc) => ctx.db.delete("deltas", doc._id)));
     if (deltas.length === MAX_DELTA_FETCH) {
       await ctx.scheduler.runAfter(0, api.lib.deleteSteps, {
         id: args.id,

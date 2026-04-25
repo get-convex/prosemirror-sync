@@ -67,7 +67,7 @@ export const updateDocSearchIndex = internalMutation({
     if (!existing) {
       await ctx.db.insert("documents", { docId: id, content });
     } else {
-      await ctx.db.patch(existing._id, { content });
+      await ctx.db.patch("documents", existing._id, { content });
     }
   },
 });
