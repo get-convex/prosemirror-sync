@@ -100,7 +100,7 @@
     "@edge-runtime/vm": "5.0.0",
     "@eslint/eslintrc": "3.3.5",
     "@eslint/js": "10.0.1",
-    "@hocuspocus/provider": "3.4.4",
+    "@hocuspocus/provider": "4.0.0",
     "@tiptap/core": "3.22.4",
     "@tiptap/extension-highlight": "3.22.4",
     "@tiptap/extension-link": "3.22.4",
