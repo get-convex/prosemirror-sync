@@ -97,7 +97,7 @@
     "@blocknote/core": "0.49.0",
     "@blocknote/mantine": "0.49.0",
     "@blocknote/react": "0.49.0",
-    "@convex-dev/eslint-plugin": "^2.0.0",
+    "@convex-dev/eslint-plugin": "2.0.0",
     "@edge-runtime/vm": "5.0.0",
     "@eslint/eslintrc": "3.3.5",
     "@eslint/js": "10.0.1",
