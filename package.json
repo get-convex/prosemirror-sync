@@ -112,7 +112,7 @@
     "@tiptap/extension-underline": "3.22.5",
     "@tiptap/react": "3.22.5",
     "@tiptap/starter-kit": "3.22.5",
-    "@types/node": "20.19.39",
+    "@types/node": "24.12.2",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "@types/ws": "8.18.1",
