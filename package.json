@@ -94,9 +94,9 @@
     }
   },
   "devDependencies": {
-    "@blocknote/core": "0.49.0",
-    "@blocknote/mantine": "0.49.0",
-    "@blocknote/react": "0.49.0",
+    "@blocknote/core": "0.50.0",
+    "@blocknote/mantine": "0.50.0",
+    "@blocknote/react": "0.50.0",
     "@convex-dev/eslint-plugin": "2.0.0",
     "@edge-runtime/vm": "5.0.0",
     "@eslint/eslintrc": "3.3.5",
@@ -128,7 +128,7 @@
     "react": "19.2.5",
     "react-dom": "19.2.5",
     "typescript": "5.9.3",
-    "typescript-eslint": "8.59.1",
+    "typescript-eslint": "8.59.2",
     "vite": "8.0.10",
     "vitest": "4.1.5"
   },
