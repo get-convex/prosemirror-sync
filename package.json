@@ -119,7 +119,7 @@
     "@vitejs/plugin-react": "6.0.1",
     "chokidar-cli": "3.0.0",
     "convex": "1.38.0",
-    "convex-test": "0.0.51",
+    "convex-test": "0.0.52",
     "eslint": "10.3.0",
     "eslint-plugin-react-hooks": "7.1.1",
     "eslint-plugin-react-refresh": "0.5.2",
@@ -128,9 +128,9 @@
     "react": "19.2.6",
     "react-dom": "19.2.6",
     "typescript": "5.9.3",
-    "typescript-eslint": "8.59.2",
+    "typescript-eslint": "8.59.3",
     "vite": "8.0.12",
-    "vitest": "4.1.5"
+    "vitest": "4.1.6"
   },
   "types": "./dist/client/index.d.ts",
   "module": "./dist/client/index.js"
