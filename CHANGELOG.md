@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.4
+
+- Fix prosemirror-collab packaging
+
 ## 0.2.3
 
 - warn on closing tab with unsynced changes (credit: bxff)
