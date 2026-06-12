@@ -1,5 +1,6 @@
 import {
   type ApiFromModules,
+  type GenericActionCtx,
   type GenericDataModel,
   type GenericMutationCtx,
   type GenericQueryCtx,
@@ -16,11 +17,14 @@ export type SyncApi = ApiFromModules<{
   sync: ReturnType<ProsemirrorSync["syncApi"]>;
 }>["sync"];
 
-// e.g. `ctx` from a Convex mutation or action.
-export type RunMutationCtx = {
-  runMutation: GenericMutationCtx<GenericDataModel>["runMutation"];
-  runQuery: GenericQueryCtx<GenericDataModel>["runQuery"];
-};
+export type MutationCtx = Pick<
+  GenericMutationCtx<GenericDataModel>,
+  "runQuery" | "runMutation"
+>;
+export type ActionCtx = Pick<
+  GenericActionCtx<GenericDataModel>,
+  "runQuery" | "runMutation" | "runAction"
+>;
 
 export class ProsemirrorSync<Id extends string = string> {
   /**
@@ -49,7 +53,7 @@ export class ProsemirrorSync<Id extends string = string> {
    * @param content - The document content. Should be ProseMirror JSON.
    * @returns A promise that resolves when the document is created.
    */
-  create(ctx: RunMutationCtx, id: Id, content: object) {
+  create(ctx: MutationCtx | ActionCtx, id: Id, content: object) {
     return ctx.runMutation(this.component.lib.submitSnapshot, {
       id,
       version: 1,
@@ -67,7 +71,7 @@ export class ProsemirrorSync<Id extends string = string> {
    *   For BlockNote, use `editor.pmSchema`.
    * @returns The latest ProseMirror doc (Node) and version.
    */
-  async getDoc(ctx: RunMutationCtx, id: Id, schema: Schema) {
+  async getDoc(ctx: MutationCtx | ActionCtx, id: Id, schema: Schema) {
     const { transform, version } = await getLatestVersion(
       ctx,
       this.component,
@@ -107,7 +111,7 @@ export class ProsemirrorSync<Id extends string = string> {
    * @returns A promise that resolves with the transformed document.
    */
   async transform(
-    ctx: RunMutationCtx,
+    ctx: MutationCtx | ActionCtx,
     id: Id,
     schema: Schema,
     fn: (
@@ -297,7 +301,7 @@ export class ProsemirrorSync<Id extends string = string> {
 }
 
 async function getLatestVersion(
-  ctx: RunMutationCtx,
+  ctx: MutationCtx | ActionCtx,
   component: ComponentApi,
   id: string,
   schema: Schema,
