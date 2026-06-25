@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.5
+
+- Update ctx types for convex@1.41+
+
 ## 0.2.4
 
 - Fix prosemirror-collab packaging
