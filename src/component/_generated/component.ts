@@ -62,6 +62,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
         "internal",
         { id: string; version: number },
         {
+          authorIds: Array<string | null>;
           clientIds: Array<string | number>;
           steps: Array<string>;
           version: number;
@@ -91,12 +92,14 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
         "mutation",
         "internal",
         {
+          authorId?: string;
           clientId: string | number;
           id: string;
           steps: Array<string>;
           version: number;
         },
         | {
+            authorIds: Array<string | null>;
             clientIds: Array<string | number>;
             status: "needs-rebase";
             steps: Array<string>;

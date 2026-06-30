@@ -79,12 +79,14 @@ export const submitSteps = mutation({
     version: v.number(),
     clientId: vClientId,
     steps: v.array(v.string()),
+    authorId: v.optional(v.string()),
   },
   returns: v.union(
     v.object({
       status: v.literal("needs-rebase"),
       clientIds: v.array(vClientId),
       steps: v.array(v.string()),
+      authorIds: v.optional(v.array(v.union(v.string(), v.null()))),
     }),
     v.object({ status: v.literal("synced") }),
   ),
@@ -96,29 +98,40 @@ export const submitSteps = mutation({
       )
       .take(MAX_DELTA_FETCH);
     if (changes.length > 0) {
-      const [steps, clientIds] = stepsAndClientIds(changes);
-      return { status: "needs-rebase", clientIds, steps } as const;
+      const { steps, clientIds, authorIds } = flattenDeltas(changes);
+      return {
+        status: "needs-rebase",
+        clientIds,
+        steps,
+        ...(authorIds ? { authorIds } : {}),
+      } as const;
     }
     await ctx.db.insert("deltas", {
       id: args.id,
       version: args.version + args.steps.length,
       clientId: args.clientId,
       steps: args.steps,
+      ...(args.authorId !== undefined ? { authorId: args.authorId } : {}),
     });
     return { status: "synced" } as const;
   },
 });
 
-function stepsAndClientIds(deltas: Doc<"deltas">[]) {
-  const clientIds = [];
-  const steps = [];
+function flattenDeltas(deltas: Doc<"deltas">[]) {
+  const clientIds: (string | number)[] = [];
+  const steps: string[] = [];
+  const hasAnyAuthor = deltas.some((d) => d.authorId !== undefined);
+  const authorIds: (string | null)[] | undefined = hasAnyAuthor
+    ? []
+    : undefined;
   for (const delta of deltas) {
     for (const step of delta.steps) {
       clientIds.push(delta.clientId);
       steps.push(step);
+      authorIds?.push(delta.authorId ?? null);
     }
   }
-  return [steps, clientIds] as const;
+  return { steps, clientIds, authorIds };
 }
 
 export const getSnapshot = query({
@@ -181,14 +194,16 @@ async function fetchSteps(
       );
     }
   }
-  const [steps, clientIds] = stepsAndClientIds(deltas);
+  const flatResult = flattenDeltas(deltas);
+  const { steps, clientIds } = flatResult;
+  let { authorIds } = flatResult;
   if (deltas.length === MAX_DELTA_FETCH) {
     console.warn(
       `Max delta fetch reached: ${id} ${afterVersion}...${
         targetVersion ?? "end"
       } stopped at ${deltas[deltas.length - 1].version}`,
     );
-    return [steps, clientIds] as const;
+    return { steps, clientIds, authorIds };
   }
   const lastDelta = deltas[deltas.length - 1];
   if (targetVersion && (!lastDelta || lastDelta.version < targetVersion)) {
@@ -206,6 +221,15 @@ async function fetchSteps(
     for (let i = 0; i < targetVersion - lastDelta.version; i++) {
       steps.push(nextDelta.steps[i]);
       clientIds.push(nextDelta.clientId);
+      if (nextDelta.authorId !== undefined) {
+        if (!authorIds) {
+          // First author encountered — backfill nulls for preceding steps.
+          authorIds = new Array<string | null>(steps.length - 1).fill(null);
+        }
+        authorIds.push(nextDelta.authorId);
+      } else {
+        authorIds?.push(null);
+      }
     }
   }
   if (targetVersion && steps.length !== targetVersion - afterVersion) {
@@ -213,7 +237,7 @@ async function fetchSteps(
       `Steps mismatch ${afterVersion}...${targetVersion}: ${steps.length}`,
     );
   }
-  return [steps, clientIds] as const;
+  return { steps, clientIds, authorIds };
 }
 
 export const getSteps = query({
@@ -221,11 +245,21 @@ export const getSteps = query({
   returns: v.object({
     steps: v.array(v.string()),
     clientIds: v.array(vClientId),
+    authorIds: v.optional(v.array(v.union(v.string(), v.null()))),
     version: v.number(),
   }),
   handler: async (ctx, args) => {
-    const [steps, clientIds] = await fetchSteps(ctx, args.id, args.version);
-    return { steps, clientIds, version: args.version + steps.length };
+    const { steps, clientIds, authorIds } = await fetchSteps(
+      ctx,
+      args.id,
+      args.version,
+    );
+    return {
+      steps,
+      clientIds,
+      ...(authorIds ? { authorIds } : {}),
+      version: args.version + steps.length,
+    };
   },
 });
 

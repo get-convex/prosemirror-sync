@@ -15,5 +15,7 @@ export default defineSchema({
     version: v.number(),
     clientId: vClientId,
     steps: v.array(v.string()),
+    // Optional identifier for the user who authored these steps.
+    authorId: v.optional(v.string()),
   }).index("id_version", ["id", "version"]),
 });
