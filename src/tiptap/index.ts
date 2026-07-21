@@ -12,6 +12,7 @@ import {
   Extension,
   type JSONContent,
 } from "@tiptap/core";
+import type { EditorState } from "@tiptap/pm/state";
 import * as collab from "prosemirror-collab";
 import { Step } from "@tiptap/pm/transform";
 import { useCallback, useMemo, useRef } from "react";
@@ -20,6 +21,9 @@ import type { SyncApi } from "../client/index.js";
 // How many steps we will attempt to sync in one request.
 const MAX_STEPS_SYNC = 1000;
 const SNAPSHOT_DEBOUNCE_MS = 1000;
+// How many consecutive rebase rounds flushPendingSteps tolerates before
+// giving up (successful submissions don't count — they always make progress).
+const MAX_FLUSH_REBASES = 20;
 
 export type UseSyncOptions = {
   onSyncError?: (error: Error) => void;
@@ -126,6 +130,7 @@ export function syncExtension(
       clearTimeout(snapshotTimer);
     }
     snapshotTimer = setTimeout(() => {
+      snapshotTimer = undefined;
       void convex
         .mutation(syncApi.submitSnapshot, { id, version, content })
         .catch(opts?.onSyncError);
@@ -136,10 +141,29 @@ export function syncExtension(
   let pending:
     | { resolve: () => void; reject: () => void; promise: Promise<void> }
     | undefined;
-  let watch: Watch<number | null> | undefined;
+  // Which editors queued behind an active sync — the retry in `finally`
+  // must serve every one of them, not whichever editor's closure happened
+  // to finish (under React StrictMode two live editors briefly share this
+  // extension instance).
+  const pendingEditors = new Set<Editor>();
+
+  // Per-editor subscription state. Storing `watch`/`unsubscribe` in shared
+  // closure variables breaks under React 18 StrictMode: the double-mount
+  // destroys the FIRST editor after the second one was created (TipTap
+  // defers destruction by a tick), so the shared `unsubscribe` — already
+  // reassigned by the second onCreate — tears down the LIVE editor's
+  // subscription and passive step delivery stalls for the whole session.
+  const subscriptions = new Map<
+    Editor,
+    { watch: Watch<number | null>; unsubscribe: () => void }
+  >();
+  const beforeUnloadHandlers = new Map<
+    Editor,
+    (e: BeforeUnloadEvent) => void
+  >();
 
   async function trySync(editor: Editor) {
-    const serverVersion = watch?.localQueryResult();
+    const serverVersion = subscriptions.get(editor)?.watch.localQueryResult();
     if (serverVersion === undefined) {
       return;
     }
@@ -148,6 +172,7 @@ export function syncExtension(
       snapshotTimer = undefined;
     }
     if (active) {
+      pendingEditors.add(editor);
       if (!pending) {
         let resolve = () => {};
         let reject = () => {};
@@ -191,22 +216,60 @@ export function syncExtension(
       if (pending) {
         const { resolve, reject } = pending;
         pending = undefined;
-        trySync(editor).then(resolve, reject);
+        // Retry every still-subscribed editor that queued — the closure's
+        // `editor` may be the destroyed StrictMode twin.
+        const targets = [...pendingEditors].filter((e) =>
+          subscriptions.has(e),
+        );
+        pendingEditors.clear();
+        if (targets.length > 0) {
+          Promise.all(targets.map((e) => trySync(e))).then(
+            () => resolve(),
+            reject,
+          );
+        } else {
+          resolve();
+        }
       }
     }
   }
-
-  let unsubscribe: (() => void) | undefined;
-  let beforeUnloadHandler: ((e: BeforeUnloadEvent) => void) | undefined;
 
   return Extension.create({
     name: "convex-sync",
     onDestroy() {
       log("destroying");
-      unsubscribe?.();
+      const editor = this.editor;
+      subscriptions.get(editor)?.unsubscribe();
+      subscriptions.delete(editor);
+      pendingEditors.delete(editor);
+      const beforeUnloadHandler = beforeUnloadHandlers.get(editor);
       if (beforeUnloadHandler) {
         window.removeEventListener?.("beforeunload", beforeUnloadHandler);
-        beforeUnloadHandler = undefined;
+        beforeUnloadHandlers.delete(editor);
+      }
+      // Only clear the debounced snapshot once the LAST editor is gone —
+      // under StrictMode the deferred first destroy runs while the second
+      // editor is live and may own the pending snapshot.
+      if (subscriptions.size === 0 && snapshotTimer) {
+        clearTimeout(snapshotTimer);
+        snapshotTimer = undefined;
+      }
+      // Local steps still awaiting confirmation must not die with the view
+      // (steps ARE the persistence model; `warnOnUnsyncedClose` only covers
+      // tab close, not in-app unmounts). The state object is immutable and
+      // outlives the view — 'destroy' fires before the view is torn down,
+      // so this read is safe.
+      const state = editor.state;
+      if (collab.sendableSteps(state)) {
+        void flushPendingSteps(convex, syncApi, id, state, opts?.debug).then(
+          (outcome) => {
+            if (outcome === "gave-up") {
+              opts?.onSyncError?.(
+                new Error("Unsynced steps could not be flushed after destroy"),
+              );
+            }
+          },
+        );
       }
     },
     onCreate() {
@@ -219,21 +282,23 @@ export function syncExtension(
         }
         this.editor.view.dispatch(tr);
       }
-      watch = convex.watchQuery(syncApi.latestVersion, { id });
-      unsubscribe = watch.onUpdate(() => {
-        void trySync(this.editor);
+      const editor = this.editor;
+      const watch = convex.watchQuery(syncApi.latestVersion, { id });
+      const unsubscribe = watch.onUpdate(() => {
+        void trySync(editor);
       });
-      void trySync(this.editor);
+      subscriptions.set(editor, { watch, unsubscribe });
+      void trySync(editor);
       // Install beforeunload handler if not explicitly disabled.
       if (opts?.warnOnUnsyncedClose !== false && typeof window !== "undefined" && typeof window.addEventListener === "function") {
-        const editor = this.editor;
-        beforeUnloadHandler = (e: BeforeUnloadEvent) => {
+        const beforeUnloadHandler = (e: BeforeUnloadEvent) => {
           if (collab.sendableSteps(editor.state)) {
             e.preventDefault();
             // Required for older browsers.
             e.returnValue = "";
           }
         };
+        beforeUnloadHandlers.set(editor, beforeUnloadHandler);
         window.addEventListener("beforeunload", beforeUnloadHandler);
       }
     },
@@ -291,14 +356,35 @@ async function doSync(
       id,
       version,
     });
-    receiveSteps(
-      editor,
-      steps.steps.map((step) => Step.fromJSON(editor.schema, JSON.parse(step))),
-      steps.clientIds,
-    );
+    if (editor.isDestroyed) return false;
+    // The local version may have advanced while the fetch was in flight
+    // (another trySync interleave, or any other applier) — applying the
+    // full batch would then re-apply an already-applied prefix, duplicating
+    // content and inflating the collab version past the server's. The next
+    // submitSteps would insert a delta with a version GAP, permanently
+    // wedging the document for every client. Apply only what is still
+    // ahead of us.
+    const skip = collab.getVersion(editor.state) - version;
+    if (skip >= 0 && skip < steps.steps.length) {
+      receiveSteps(
+        editor,
+        steps.steps
+          .slice(skip)
+          .map((step) => Step.fromJSON(editor.schema, JSON.parse(step))),
+        steps.clientIds.slice(skip),
+      );
+    }
   }
   let anyChanges = false;
   while (true) {
+    // A destroy mid-round-trip freezes editor.state (dispatching to a
+    // destroyed view is a silent no-op), so the confirm/rebase applies
+    // below stop landing and this loop would re-submit the same stale
+    // batch forever. onDestroy's flushPendingSteps owns the remaining
+    // steps from here. Return false: the frozen state still shows
+    // sendable steps, and reporting a successful sync would trip the
+    // "Synced but still have sendable steps" invariant in trySync.
+    if (editor.isDestroyed) return false;
     const sendable = collab.sendableSteps(editor.state);
     if (!sendable) {
       break;
@@ -355,6 +441,69 @@ function receiveSteps(
       mapSelectionBackward: true,
     }),
   );
+}
+
+/**
+ * Submit a destroyed editor's unconfirmed local steps — the doSync send
+ * loop run headlessly against the captured EditorState (which is immutable
+ * and outlives the view). prosemirror-collab's receiveTransaction does the
+ * heavy lifting exactly as it would live: own-clientID steps confirm (the
+ * pre-destroy in-flight submit may turn out to have landed them), foreign
+ * steps rebase ours. Best-effort: a network/permission failure means the
+ * steps are lost — the same outcome as before this existed — but the
+ * common case (in-app navigation mid round-trip) now persists.
+ */
+async function flushPendingSteps(
+  convex: ConvexReactClient,
+  syncApi: SyncApi,
+  id: string,
+  state: EditorState,
+  debug?: boolean,
+): Promise<"flushed" | "gave-up"> {
+  const log: typeof console.log = debug ? console.debug : () => {};
+  let rebases = 0;
+  while (rebases < MAX_FLUSH_REBASES) {
+    const sendable = collab.sendableSteps(state);
+    if (!sendable) return "flushed";
+    // Confirm only what is actually sent this round — the remainder past
+    // MAX_STEPS_SYNC drains on the next iteration.
+    const toSend = sendable.steps.slice(0, MAX_STEPS_SYNC);
+    let result;
+    try {
+      result = await convex.mutation(syncApi.submitSteps, {
+        id,
+        version: sendable.version,
+        clientId: sendable.clientID,
+        steps: toSend.map((step) => JSON.stringify(step.toJSON())),
+      });
+    } catch (error) {
+      log("Flush after destroy failed", { id, error });
+      return "gave-up";
+    }
+    if (result.status === "synced") {
+      state = state.apply(
+        collab.receiveTransaction(
+          state,
+          toSend,
+          toSend.map(() => sendable.clientID),
+          { mapSelectionBackward: true },
+        ),
+      );
+    } else {
+      rebases++;
+      state = state.apply(
+        collab.receiveTransaction(
+          state,
+          result.steps.map((step) =>
+            Step.fromJSON(state.schema, JSON.parse(step)),
+          ),
+          result.clientIds,
+          { mapSelectionBackward: true },
+        ),
+      );
+    }
+  }
+  return "gave-up";
 }
 
 type InitialState = {
