@@ -21,11 +21,22 @@ import type { SyncApi } from "../client/index.js";
 // How many steps we will attempt to sync in one request.
 const MAX_STEPS_SYNC = 1000;
 const SNAPSHOT_DEBOUNCE_MS = 1000;
-// How many consecutive rebase rounds flushPendingSteps tolerates before
-// giving up (successful submissions don't count — they always make progress).
-const MAX_FLUSH_REBASES = 20;
 
 export type UseSyncOptions = {
+  /**
+   * Called when syncing fails, including for background work that has no
+   * caller to propagate to (the debounced snapshot submit, and the flush of
+   * unconfirmed steps when the editor is destroyed).
+   *
+   * Most errors are informational: the extension keeps syncing and retries on
+   * the next local change or update from the server, and a failed snapshot
+   * submit costs nothing since snapshots only save replaying steps.
+   *
+   * The exception is "Unsynced steps could not be flushed after destroy",
+   * which means local steps never reached the server before the editor went
+   * away. Without a handler that one surfaces as an unhandled rejection
+   * rather than being dropped silently.
+   */
   onSyncError?: (error: Error) => void;
   snapshotDebounceMs?: number;
   debug?: boolean;
@@ -124,6 +135,24 @@ export function syncExtension(
   opts?: UseSyncOptions,
 ): AnyExtension {
   const log: typeof console.log = opts?.debug ? console.debug : () => {};
+  // Background work has no caller to propagate a failure to, so it reports
+  // through one of these two. The split is whether local edits were lost.
+
+  // Lost work: tell the app even if it didn't ask to be told, since silently
+  // dropping a user's edits is never the right default. Rethrowing from here
+  // surfaces as an unhandled rejection, matching `trySync`.
+  const reportDataLoss = (error: Error) => {
+    if (opts?.onSyncError) {
+      opts.onSyncError(error);
+    } else {
+      throw error;
+    }
+  };
+  // Nothing durable lost: report it if the app is listening, then carry on.
+  const reportRecoverable = (error: Error) => {
+    log("Ignoring recoverable sync error", error);
+    opts?.onSyncError?.(error);
+  };
   let snapshotTimer: NodeJS.Timeout | undefined;
   const trySubmitSnapshot = (version: number, content: string) => {
     if (snapshotTimer) {
@@ -131,9 +160,11 @@ export function syncExtension(
     }
     snapshotTimer = setTimeout(() => {
       snapshotTimer = undefined;
+      // Snapshots are an optimization over replaying steps, and the next one
+      // supersedes this one, so a failure here costs us nothing.
       void convex
         .mutation(syncApi.submitSnapshot, { id, version, content })
-        .catch(opts?.onSyncError);
+        .catch(reportRecoverable);
     }, opts?.snapshotDebounceMs ?? SNAPSHOT_DEBOUNCE_MS);
   };
 
@@ -141,18 +172,13 @@ export function syncExtension(
   let pending:
     | { resolve: () => void; reject: () => void; promise: Promise<void> }
     | undefined;
-  // Which editors queued behind an active sync — the retry in `finally`
-  // must serve every one of them, not whichever editor's closure happened
-  // to finish (under React StrictMode two live editors briefly share this
-  // extension instance).
+  // Every editor that queued behind the active sync, so the retry in
+  // `finally` serves all of them.
   const pendingEditors = new Set<Editor>();
 
-  // Per-editor subscription state. Storing `watch`/`unsubscribe` in shared
-  // closure variables breaks under React 18 StrictMode: the double-mount
-  // destroys the FIRST editor after the second one was created (TipTap
-  // defers destruction by a tick), so the shared `unsubscribe` — already
-  // reassigned by the second onCreate — tears down the LIVE editor's
-  // subscription and passive step delivery stalls for the whole session.
+  // Editor-keyed, not shared closure variables: StrictMode's double-mount
+  // briefly gives two live editors the same extension instance, and each must
+  // tear down only its own subscription.
   const subscriptions = new Map<
     Editor,
     { watch: Watch<number | null>; unsubscribe: () => void }
@@ -218,9 +244,7 @@ export function syncExtension(
         pending = undefined;
         // Retry every still-subscribed editor that queued — the closure's
         // `editor` may be the destroyed StrictMode twin.
-        const targets = [...pendingEditors].filter((e) =>
-          subscriptions.has(e),
-        );
+        const targets = [...pendingEditors].filter((e) => subscriptions.has(e));
         pendingEditors.clear();
         if (targets.length > 0) {
           Promise.all(targets.map((e) => trySync(e))).then(
@@ -247,28 +271,29 @@ export function syncExtension(
         window.removeEventListener?.("beforeunload", beforeUnloadHandler);
         beforeUnloadHandlers.delete(editor);
       }
-      // Only clear the debounced snapshot once the LAST editor is gone —
-      // under StrictMode the deferred first destroy runs while the second
-      // editor is live and may own the pending snapshot.
+      // A snapshot may belong to an editor that's still live, so only cancel
+      // it once the last one is gone.
       if (subscriptions.size === 0 && snapshotTimer) {
         clearTimeout(snapshotTimer);
         snapshotTimer = undefined;
       }
-      // Local steps still awaiting confirmation must not die with the view
-      // (steps ARE the persistence model; `warnOnUnsyncedClose` only covers
-      // tab close, not in-app unmounts). The state object is immutable and
-      // outlives the view — 'destroy' fires before the view is torn down,
-      // so this read is safe.
+      // Unconfirmed steps outlive the view: they're the only record of these
+      // edits, and `warnOnUnsyncedClose` covers tab close but can't cover an
+      // in-app unmount. 'destroy' fires before the view is torn down and the
+      // state is immutable, so it's safe to capture and use afterwards.
       const state = editor.state;
       if (collab.sendableSteps(state)) {
-        void flushPendingSteps(convex, syncApi, id, state, opts?.debug).then(
+        void _flushPendingSteps(convex, syncApi, id, state, opts?.debug).then(
           (outcome) => {
             if (outcome === "gave-up") {
-              opts?.onSyncError?.(
+              reportDataLoss(
                 new Error("Unsynced steps could not be flushed after destroy"),
               );
             }
           },
+          // The flush resolves "gave-up" for a failed submit but rejects for a
+          // step that won't apply, and both mean the steps are lost.
+          reportDataLoss,
         );
       }
     },
@@ -290,7 +315,11 @@ export function syncExtension(
       subscriptions.set(editor, { watch, unsubscribe });
       void trySync(editor);
       // Install beforeunload handler if not explicitly disabled.
-      if (opts?.warnOnUnsyncedClose !== false && typeof window !== "undefined" && typeof window.addEventListener === "function") {
+      if (
+        opts?.warnOnUnsyncedClose !== false &&
+        typeof window !== "undefined" &&
+        typeof window.addEventListener === "function"
+      ) {
         const beforeUnloadHandler = (e: BeforeUnloadEvent) => {
           if (collab.sendableSteps(editor.state)) {
             e.preventDefault();
@@ -357,13 +386,10 @@ async function doSync(
       version,
     });
     if (editor.isDestroyed) return false;
-    // The local version may have advanced while the fetch was in flight
-    // (another trySync interleave, or any other applier) — applying the
-    // full batch would then re-apply an already-applied prefix, duplicating
-    // content and inflating the collab version past the server's. The next
-    // submitSteps would insert a delta with a version GAP, permanently
-    // wedging the document for every client. Apply only what is still
-    // ahead of us.
+    // Apply only the steps we don't already have: the local version can
+    // advance during the await. Re-applying a prefix would push our version
+    // past the server's, and the next submitSteps would then write a delta
+    // with a version gap, which no client can read past.
     const skip = collab.getVersion(editor.state) - version;
     if (skip >= 0 && skip < steps.steps.length) {
       receiveSteps(
@@ -377,13 +403,11 @@ async function doSync(
   }
   let anyChanges = false;
   while (true) {
-    // A destroy mid-round-trip freezes editor.state (dispatching to a
-    // destroyed view is a silent no-op), so the confirm/rebase applies
-    // below stop landing and this loop would re-submit the same stale
-    // batch forever. onDestroy's flushPendingSteps owns the remaining
-    // steps from here. Return false: the frozen state still shows
-    // sendable steps, and reporting a successful sync would trip the
-    // "Synced but still have sendable steps" invariant in trySync.
+    // Stop once the view is gone: dispatching to it is a silent no-op, so
+    // editor.state would never advance and this loop would resubmit forever.
+    // onDestroy owns the remaining steps from here. Reporting no changes is
+    // required — the state still has sendable steps, which trySync treats as
+    // an invariant violation on a successful sync.
     if (editor.isDestroyed) return false;
     const sendable = collab.sendableSteps(editor.state);
     if (!sendable) {
@@ -443,17 +467,27 @@ function receiveSteps(
   );
 }
 
+// How many rebase rounds the post-destroy flush attempts before giving up and
+// reporting the steps as lost. Successful submissions don't count — they always
+// make progress — so this only trips when other clients keep winning the race.
+// The flush has no editor and no user behind it, and the page may be unloading,
+// so it can't retry indefinitely the way a live editor does.
+const MAX_FLUSH_REBASES = 20;
+
 /**
- * Submit a destroyed editor's unconfirmed local steps — the doSync send
- * loop run headlessly against the captured EditorState (which is immutable
- * and outlives the view). prosemirror-collab's receiveTransaction does the
- * heavy lifting exactly as it would live: own-clientID steps confirm (the
- * pre-destroy in-flight submit may turn out to have landed them), foreign
- * steps rebase ours. Best-effort: a network/permission failure means the
- * steps are lost — the same outcome as before this existed — but the
- * common case (in-app navigation mid round-trip) now persists.
+ * Submit a destroyed editor's unconfirmed local steps: the doSync send loop,
+ * run headlessly against the captured EditorState, which is immutable and
+ * outlives the view. prosemirror-collab's receiveTransaction behaves as it
+ * would live — own-clientID steps confirm (the in-flight submit at destroy may
+ * have landed them), foreign steps rebase ours.
+ *
+ * Best-effort: resolves "gave-up" if the submit fails, and rejects if a step
+ * won't apply to the captured state. Either way the steps are lost, and
+ * `onDestroy` reports both through `onSyncError`.
+ *
+ * @internal Exported for tests, hence the underscore. Not a supported API.
  */
-async function flushPendingSteps(
+export async function _flushPendingSteps(
   convex: ConvexReactClient,
   syncApi: SyncApi,
   id: string,

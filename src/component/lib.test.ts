@@ -241,6 +241,34 @@ describe("prosemirror lib", () => {
       }),
     ).rejects.toThrow();
   });
+  test("a gap in the delta log makes getSteps fail permanently", async () => {
+    // The invariant clients must not break: submitSteps doesn't check that the
+    // submitted version is the server's head, so a client whose local version
+    // has drifted ahead writes a delta with a gap — after which no client can
+    // catch up. This is why the tiptap extension re-checks its collab version
+    // after awaiting getSteps before applying them.
+    const t = convexTest(schema, modules);
+    const id = crypto.randomUUID();
+    await t.run(async (ctx) => {
+      await ctx.db.insert("snapshots", { id, version: 1, content: "content" });
+      await ctx.db.insert("deltas", {
+        id,
+        version: 2,
+        clientId: "client1",
+        steps: ["a"],
+      });
+      // Versions 3 and 4 were never recorded: this client believed it was at 4.
+      await ctx.db.insert("deltas", {
+        id,
+        version: 5,
+        clientId: "client2",
+        steps: ["d"],
+      });
+    });
+    await expect(t.query(api.lib.getSteps, { id, version: 2 })).rejects.toThrow(
+      "Missing steps 3...4",
+    );
+  });
   test("submitSnapshot deletes older snapshot", async () => {
     const t = convexTest(schema, modules);
     const id = crypto.randomUUID();

@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.2.6
+
+- Fix three tiptap editor lifecycle bugs (thanks @kloudysky!):
+  - React StrictMode's double-mount tore down the surviving editor's
+    `latestVersion` subscription, so steps from other clients stopped arriving
+    until the local user typed.
+  - `doSync` didn't re-check its collab version after awaiting `getSteps`, so an
+    interleaved apply could apply the same steps twice and push the local
+    version past the server's. The next submit then wrote a delta with a version
+    gap, which leaves the document unreadable for every client.
+  - Destroying an editor dropped local steps that hadn't been confirmed yet —
+    switching documents in a single-page app mid-round-trip, say. They're now
+    flushed in the background, and the debounced snapshot timer is cleared once
+    the last editor unmounts.
+- `onSyncError` now also hears about background failures that previously had
+  nowhere to go: the destroy-time step flush, and the debounced snapshot submit.
+  Losing unsynced steps still surfaces (as an unhandled rejection) if you
+  haven't passed a handler; a failed snapshot submit no longer does, since
+  snapshots are only an optimization over replaying steps.
+
 ## 0.2.5
 
 - Update ctx types for convex@1.41+
