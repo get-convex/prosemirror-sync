@@ -1,0 +1,369 @@
+/// <reference types="vite/client" />
+
+import { webcrypto as crypto } from "node:crypto";
+import { describe, expect, test, vi } from "vitest";
+import { convexTest, type TestConvex } from "convex-test";
+import type { ConvexReactClient } from "convex/react";
+import type { AnyExtension, Editor } from "@tiptap/core";
+import { Schema } from "@tiptap/pm/model";
+import { EditorState } from "@tiptap/pm/state";
+import * as collab from "prosemirror-collab";
+import componentSchema from "../component/schema.js";
+import { api } from "../component/_generated/api.js";
+import type { SyncApi } from "../client/index.js";
+import { _flushPendingSteps, syncExtension } from "./index.js";
+
+const modules = import.meta.glob("../component/**/*.*s");
+
+// The component's function references are shaped the same as the ones the
+// client generates via `prosemirrorSync.syncApi()`.
+const syncApi = api.lib as unknown as SyncApi;
+
+type SubmitStepsArgs = {
+  id: string;
+  version: number;
+  clientId: string | number;
+  steps: string[];
+};
+type SubmitStepsResult =
+  | { status: "synced" }
+  | {
+      status: "needs-rebase";
+      steps: string[];
+      clientIds: (string | number)[];
+    };
+
+/**
+ * A `ConvexReactClient` stand-in exposing just what `_flushPendingSteps` uses:
+ * `mutation(syncApi.submitSteps, args)`. The function reference is ignored
+ * since that's the only call it makes.
+ */
+function fakeClient(
+  submitSteps: (args: SubmitStepsArgs) => Promise<SubmitStepsResult>,
+): ConvexReactClient {
+  return {
+    mutation: (_reference: unknown, args: unknown) =>
+      submitSteps(args as SubmitStepsArgs),
+  } as unknown as ConvexReactClient;
+}
+
+function realClient(t: TestConvex<typeof componentSchema>): ConvexReactClient {
+  return fakeClient((args) => t.mutation(api.lib.submitSteps, args));
+}
+
+// A minimal schema: enough to make real ProseMirror steps that apply cleanly.
+const schema = new Schema({
+  nodes: {
+    doc: { content: "paragraph+" },
+    paragraph: { content: "text*", toDOM: () => ["p", 0] },
+    text: {},
+  },
+});
+
+/** An editor state with the collab plugin at `version`, as the extension sets up. */
+function stateAt(version: number, clientID: string) {
+  return EditorState.create({
+    schema,
+    plugins: [collab.collab({ version, clientID })],
+  });
+}
+
+/** Produce an unconfirmed local step, the way typing in the editor would. */
+function typeText(state: EditorState, text: string) {
+  return state.apply(state.tr.insertText(text, 1));
+}
+
+function stepsJSON(state: EditorState) {
+  return collab
+    .sendableSteps(state)!
+    .steps.map((step) => JSON.stringify(step.toJSON()));
+}
+
+async function seedSnapshot(
+  t: TestConvex<typeof componentSchema>,
+  id: string,
+  version = 1,
+) {
+  await t.run(async (ctx) => {
+    await ctx.db.insert("snapshots", { id, version, content: "{}" });
+  });
+}
+
+describe("_flushPendingSteps", () => {
+  test("submits unconfirmed steps left over when the editor is destroyed", async () => {
+    const t = convexTest(componentSchema, modules);
+    const id = crypto.randomUUID();
+    await seedSnapshot(t, id);
+    const state = typeText(stateAt(1, "me"), "hello");
+    expect(collab.sendableSteps(state)).not.toBeNull();
+
+    expect(await _flushPendingSteps(realClient(t), syncApi, id, state)).toBe(
+      "flushed",
+    );
+
+    // The step the destroyed view was still holding is now on the server.
+    const server = await t.query(api.lib.getSteps, { id, version: 1 });
+    expect(server.version).toBe(2);
+    expect(server.clientIds).toEqual(["me"]);
+  });
+
+  test("rebases over steps that landed first, then submits", async () => {
+    const t = convexTest(componentSchema, modules);
+    const id = crypto.randomUUID();
+    // Another client's edit reached the server while we were unmounting.
+    const foreignSteps = stepsJSON(typeText(stateAt(1, "other"), "abc"));
+    await seedSnapshot(t, id);
+    await t.run(async (ctx) => {
+      await ctx.db.insert("deltas", {
+        id,
+        version: 2,
+        clientId: "other",
+        steps: foreignSteps,
+      });
+    });
+    const state = typeText(stateAt(1, "me"), "XYZ");
+
+    expect(await _flushPendingSteps(realClient(t), syncApi, id, state)).toBe(
+      "flushed",
+    );
+
+    const server = await t.query(api.lib.getSteps, { id, version: 1 });
+    expect(server.version).toBe(3);
+    expect(server.clientIds).toEqual(["other", "me"]);
+  });
+
+  test("confirms — without duplicating — steps whose in-flight submit landed", async () => {
+    const t = convexTest(componentSchema, modules);
+    const id = crypto.randomUUID();
+    const state = typeText(stateAt(1, "me"), "hello");
+    // The submitSteps that was in flight when the editor was destroyed did
+    // land; the view just never got to apply the confirmation.
+    const ownSteps = stepsJSON(state);
+    await seedSnapshot(t, id);
+    await t.run(async (ctx) => {
+      await ctx.db.insert("deltas", {
+        id,
+        version: 2,
+        clientId: "me",
+        steps: ownSteps,
+      });
+    });
+
+    expect(await _flushPendingSteps(realClient(t), syncApi, id, state)).toBe(
+      "flushed",
+    );
+
+    // Still one delta: the steps were recognized as ours and confirmed, not
+    // written a second time.
+    const server = await t.query(api.lib.getSteps, { id, version: 1 });
+    expect(server.version).toBe(2);
+    expect(server.steps).toEqual(ownSteps);
+  });
+
+  test("confirms own landed steps and absorbs foreign ones after them", async () => {
+    const t = convexTest(componentSchema, modules);
+    const id = crypto.randomUUID();
+    const state = typeText(stateAt(1, "me"), "mine");
+    const ownSteps = stepsJSON(state);
+    // Our in-flight submit landed at v2, then another client edited on top of
+    // it, so the needs-rebase response is ours-then-theirs.
+    const foreign = typeText(
+      EditorState.create({
+        doc: state.doc,
+        plugins: [collab.collab({ version: 2, clientID: "other" })],
+      }),
+      "THEIRS",
+    );
+    await seedSnapshot(t, id);
+    await t.run(async (ctx) => {
+      await ctx.db.insert("deltas", {
+        id,
+        version: 2,
+        clientId: "me",
+        steps: ownSteps,
+      });
+      await ctx.db.insert("deltas", {
+        id,
+        version: 3,
+        clientId: "other",
+        steps: stepsJSON(foreign),
+      });
+    });
+
+    expect(await _flushPendingSteps(realClient(t), syncApi, id, state)).toBe(
+      "flushed",
+    );
+
+    const server = await t.query(api.lib.getSteps, { id, version: 1 });
+    expect(server.version).toBe(3);
+    expect(server.clientIds).toEqual(["me", "other"]);
+  });
+
+  test("sends steps in batches, confirming only what each round submitted", async () => {
+    const t = convexTest(componentSchema, modules);
+    const id = crypto.randomUUID();
+    await seedSnapshot(t, id);
+    // More steps than MAX_STEPS_SYNC (1000), so the flush needs two rounds.
+    let state = stateAt(1, "me");
+    for (let i = 0; i < 1001; i++) {
+      state = typeText(state, "a");
+    }
+    expect(collab.sendableSteps(state)!.steps.length).toBe(1001);
+
+    expect(await _flushPendingSteps(realClient(t), syncApi, id, state)).toBe(
+      "flushed",
+    );
+
+    await t.run(async (ctx) => {
+      const deltas = await ctx.db
+        .query("deltas")
+        .withIndex("id_version", (q) => q.eq("id", id))
+        .collect();
+      expect(deltas.map((d) => d.steps.length)).toEqual([1000, 1]);
+      expect(deltas[deltas.length - 1].version).toBe(1002);
+    });
+  });
+
+  test("does nothing when there is nothing unconfirmed", async () => {
+    const t = convexTest(componentSchema, modules);
+    const id = crypto.randomUUID();
+    await seedSnapshot(t, id);
+
+    expect(
+      await _flushPendingSteps(realClient(t), syncApi, id, stateAt(1, "me")),
+    ).toBe("flushed");
+
+    const server = await t.query(api.lib.getSteps, { id, version: 1 });
+    expect(server.steps).toEqual([]);
+  });
+
+  test("gives up (rather than throwing) when the submit fails", async () => {
+    const state = typeText(stateAt(1, "me"), "hello");
+    const convex = fakeClient(() => Promise.reject(new Error("network down")));
+
+    expect(await _flushPendingSteps(convex, syncApi, "doc", state)).toBe(
+      "gave-up",
+    );
+  });
+
+  test("gives up instead of rebasing forever", async () => {
+    const state = typeText(stateAt(1, "me"), "hello");
+    // A server that never accepts our steps: every submit needs another rebase.
+    const foreignStep = stepsJSON(typeText(stateAt(1, "other"), "x"))[0];
+    let calls = 0;
+    const convex = fakeClient(() => {
+      calls++;
+      return Promise.resolve({
+        status: "needs-rebase",
+        steps: [foreignStep],
+        clientIds: ["other"],
+      } as const);
+    });
+
+    expect(await _flushPendingSteps(convex, syncApi, "doc", state)).toBe(
+      "gave-up",
+    );
+    expect(calls).toBeGreaterThan(1);
+    expect(calls).toBeLessThan(100);
+  });
+
+  test("rejects when a step can't be applied, so onDestroy can report it", async () => {
+    const t = convexTest(componentSchema, modules);
+    const id = crypto.randomUUID();
+    await seedSnapshot(t, id);
+    // A delta the local schema can't make sense of, so the rebase throws
+    // rather than the mutation. onDestroy routes this to onSyncError.
+    await t.run(async (ctx) => {
+      await ctx.db.insert("deltas", {
+        id,
+        version: 2,
+        clientId: "other",
+        steps: ["{}"],
+      });
+    });
+    const state = typeText(stateAt(1, "me"), "hello");
+
+    await expect(
+      _flushPendingSteps(realClient(t), syncApi, id, state),
+    ).rejects.toThrow();
+  });
+});
+
+/**
+ * Call the extension's onDestroy the way tiptap does, with a stand-in for the
+ * editor: onDestroy only reads `editor.state`, and that state is a real one.
+ * (A real Editor needs a DOM, which this test environment doesn't have.)
+ */
+function destroy(extension: AnyExtension, state: EditorState) {
+  const onDestroy = (
+    extension.config as {
+      onDestroy?: (this: { editor: Editor }) => void;
+    }
+  ).onDestroy;
+  onDestroy!.call({ editor: { state } as Editor });
+}
+
+function extensionWith(
+  convex: ConvexReactClient,
+  onSyncError: (error: Error) => void,
+) {
+  return syncExtension(
+    convex,
+    "doc",
+    syncApi,
+    { initialContent: { type: "doc", content: [] }, initialVersion: 1 },
+    { onSyncError },
+  );
+}
+
+describe("onDestroy error reporting", () => {
+  test("reports a flush that gave up", async () => {
+    const errors: Error[] = [];
+    const convex = fakeClient(() => Promise.reject(new Error("network down")));
+
+    destroy(
+      extensionWith(convex, (error) => errors.push(error)),
+      typeText(stateAt(1, "me"), "hello"),
+    );
+
+    await vi.waitFor(() => expect(errors).toHaveLength(1));
+    expect(errors[0].message).toContain(
+      "Unsynced steps could not be flushed after destroy",
+    );
+  });
+
+  test("reports a flush that threw rather than becoming an unhandled rejection", async () => {
+    const errors: Error[] = [];
+    // A step the flush can't apply: this rejects the flush promise instead of
+    // resolving to "gave-up", so it only reaches onSyncError if onDestroy
+    // attached a rejection handler.
+    const convex = fakeClient(() =>
+      Promise.resolve({
+        status: "needs-rebase",
+        steps: ["{}"],
+        clientIds: ["other"],
+      } as const),
+    );
+
+    destroy(
+      extensionWith(convex, (error) => errors.push(error)),
+      typeText(stateAt(1, "me"), "hello"),
+    );
+
+    await vi.waitFor(() => expect(errors).toHaveLength(1));
+    expect(errors[0].message).not.toContain("could not be flushed");
+  });
+
+  test("stays quiet when there is nothing to flush", async () => {
+    const errors: Error[] = [];
+    const convex = fakeClient(() => Promise.reject(new Error("never called")));
+
+    destroy(
+      extensionWith(convex, (error) => errors.push(error)),
+      stateAt(1, "me"),
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(errors).toEqual([]);
+  });
+});
