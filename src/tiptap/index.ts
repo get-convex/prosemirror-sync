@@ -26,6 +26,17 @@ const SNAPSHOT_DEBOUNCE_MS = 1000;
 const MAX_FLUSH_REBASES = 20;
 
 export type UseSyncOptions = {
+  /**
+   * Called when syncing fails. Strongly recommended: some sync work happens
+   * with no caller to propagate to (the debounced snapshot submit, and the
+   * flush of unconfirmed steps when the editor is destroyed), so without this
+   * handler those failures surface as unhandled promise rejections.
+   *
+   * Errors are informational — the extension keeps syncing and will retry on
+   * the next local change or server update. The one error that indicates data
+   * loss is "Unsynced steps could not be flushed after destroy": local steps
+   * that never reached the server before the editor went away.
+   */
   onSyncError?: (error: Error) => void;
   snapshotDebounceMs?: number;
   debug?: boolean;
@@ -124,6 +135,18 @@ export function syncExtension(
   opts?: UseSyncOptions,
 ): AnyExtension {
   const log: typeof console.log = opts?.debug ? console.debug : () => {};
+  // Errors from fire-and-forget paths (the debounced snapshot submit, the
+  // destroy-time flush) have no caller to propagate to. Route them to
+  // `onSyncError` when it's provided; otherwise rethrow, matching `trySync`
+  // so that a missing handler is loud rather than silently dropping the
+  // failure. See the "Handling sync errors" section of the README.
+  const reportError = (error: Error) => {
+    if (opts?.onSyncError) {
+      opts.onSyncError(error);
+    } else {
+      throw error;
+    }
+  };
   let snapshotTimer: NodeJS.Timeout | undefined;
   const trySubmitSnapshot = (version: number, content: string) => {
     if (snapshotTimer) {
@@ -133,7 +156,7 @@ export function syncExtension(
       snapshotTimer = undefined;
       void convex
         .mutation(syncApi.submitSnapshot, { id, version, content })
-        .catch(opts?.onSyncError);
+        .catch(reportError);
     }, opts?.snapshotDebounceMs ?? SNAPSHOT_DEBOUNCE_MS);
   };
 
@@ -218,9 +241,7 @@ export function syncExtension(
         pending = undefined;
         // Retry every still-subscribed editor that queued — the closure's
         // `editor` may be the destroyed StrictMode twin.
-        const targets = [...pendingEditors].filter((e) =>
-          subscriptions.has(e),
-        );
+        const targets = [...pendingEditors].filter((e) => subscriptions.has(e));
         pendingEditors.clear();
         if (targets.length > 0) {
           Promise.all(targets.map((e) => trySync(e))).then(
@@ -264,11 +285,16 @@ export function syncExtension(
         void flushPendingSteps(convex, syncApi, id, state, opts?.debug).then(
           (outcome) => {
             if (outcome === "gave-up") {
-              opts?.onSyncError?.(
+              reportError(
                 new Error("Unsynced steps could not be flushed after destroy"),
               );
             }
           },
+          // Only the mutation is caught inside flushPendingSteps; a step that
+          // fails to apply against the captured state (or a malformed step
+          // from the server) rejects here. Without this handler that would be
+          // an unhandled rejection at teardown instead of a reported error.
+          reportError,
         );
       }
     },
@@ -290,7 +316,11 @@ export function syncExtension(
       subscriptions.set(editor, { watch, unsubscribe });
       void trySync(editor);
       // Install beforeunload handler if not explicitly disabled.
-      if (opts?.warnOnUnsyncedClose !== false && typeof window !== "undefined" && typeof window.addEventListener === "function") {
+      if (
+        opts?.warnOnUnsyncedClose !== false &&
+        typeof window !== "undefined" &&
+        typeof window.addEventListener === "function"
+      ) {
         const beforeUnloadHandler = (e: BeforeUnloadEvent) => {
           if (collab.sendableSteps(editor.state)) {
             e.preventDefault();
@@ -452,8 +482,13 @@ function receiveSteps(
  * steps rebase ours. Best-effort: a network/permission failure means the
  * steps are lost — the same outcome as before this existed — but the
  * common case (in-app navigation mid round-trip) now persists.
+ *
+ * Rejects if a step fails to apply against the captured state; the caller in
+ * `onDestroy` routes that to `onSyncError`.
+ *
+ * @internal Exported for tests. Not part of the supported API.
  */
-async function flushPendingSteps(
+export async function flushPendingSteps(
   convex: ConvexReactClient,
   syncApi: SyncApi,
   id: string,

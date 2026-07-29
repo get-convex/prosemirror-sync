@@ -221,6 +221,44 @@ const sync = useTiptapSync(api.example, "some-id", {
 });
 ```
 
+### Handling sync errors
+
+Pass `onSyncError` to be told when syncing fails:
+
+```ts
+const sync = useTiptapSync(api.example, "some-id", {
+  onSyncError: (error) => {
+    console.error("Sync failed", error);
+  },
+});
+```
+
+It's strongly recommended. Most sync work happens in the background, with no
+caller to propagate a failure to:
+
+- The debounced snapshot submit.
+- The flush of unconfirmed steps when the editor is destroyed (see below).
+
+Without a handler, those failures surface as unhandled promise rejections
+instead.
+
+Errors are generally informational — the extension keeps syncing, and retries on
+the next local change or update from the server. The one error that means data
+was lost is `"Unsynced steps could not be flushed after destroy"`: local steps
+that never made it to the server before the editor went away.
+
+### Unmounting with unsynced changes
+
+Local steps are the source of truth until the server confirms them, so when an
+editor is destroyed with steps still in flight — the user switches documents in
+your app mid-round-trip, for instance — the extension submits them in the
+background rather than dropping them. `warnOnUnsyncedClose` only covers closing
+the tab, which the browser lets us block; an in-app unmount can't be blocked.
+
+The flush is best-effort: if the request fails (offline, say), the steps are
+lost and `onSyncError` is called. To avoid the situation entirely, keep the
+editor mounted until `collab.sendableSteps(editor.state)` returns null.
+
 ### Creating a new document
 
 You can create a new document from the client by calling `sync.create(content)`,
