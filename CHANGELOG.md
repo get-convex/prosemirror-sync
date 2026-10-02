@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.7
+
+- Guard pending step submission for editor destruction during server submission
+
 ## 0.2.6
 
 - Fix three tiptap editor lifecycle bugs (thanks @kloudysky!):
