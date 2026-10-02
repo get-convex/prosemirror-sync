@@ -4,9 +4,11 @@ import { webcrypto as crypto } from "node:crypto";
 import { describe, expect, test, vi } from "vitest";
 import { convexTest, type TestConvex } from "convex-test";
 import type { ConvexReactClient } from "convex/react";
+import { getFunctionName } from "convex/server";
 import type { AnyExtension, Editor } from "@tiptap/core";
 import { Schema } from "@tiptap/pm/model";
 import { EditorState } from "@tiptap/pm/state";
+import { Step } from "@tiptap/pm/transform";
 import * as collab from "prosemirror-collab";
 import componentSchema from "../component/schema.js";
 import { api } from "../component/_generated/api.js";
@@ -315,6 +317,108 @@ function extensionWith(
     { onSyncError },
   );
 }
+
+describe("destroy during sync", () => {
+  test.each(["synced", "needs-rebase"] as const)(
+    "leaves the flush in charge when the in-flight submit returns %s",
+    async (status) => {
+      const t = convexTest(componentSchema, modules);
+      await seedSnapshot(t, "doc");
+      if (status === "needs-rebase") {
+        await t.mutation(api.lib.submitSteps, {
+          id: "doc",
+          version: 1,
+          clientId: "other",
+          steps: stepsJSON(typeText(stateAt(1, "other"), "remote")),
+        });
+      }
+
+      let releaseSubmit!: () => void;
+      const inFlight = new Promise<void>((resolve) => {
+        releaseSubmit = resolve;
+      });
+      // Preserve Convex's mutation ordering while holding the live submit
+      // open. The destroy-time flush queues behind it against the real backend.
+      let queue: Promise<unknown> = inFlight;
+      const submit = vi.fn((args: SubmitStepsArgs) => {
+        const result = queue.then(() => t.mutation(api.lib.submitSteps, args));
+        queue = result;
+        return result;
+      });
+      const unsubscribe = vi.fn();
+      const submitSnapshot = vi.fn();
+      const convex = {
+        mutation: (reference: SyncApi["submitSteps"], args: SubmitStepsArgs) =>
+          getFunctionName(reference) === getFunctionName(syncApi.submitSteps)
+            ? submit(args)
+            : submitSnapshot(args),
+        watchQuery: () => ({
+          localQueryResult: () => 1,
+          onUpdate: () => unsubscribe,
+        }),
+      } as unknown as ConvexReactClient;
+      const onSyncError = vi.fn();
+      const extension = extensionWith(convex, onSyncError);
+      const hooks = extension.config as unknown as {
+        onCreate: (this: { editor: Editor }) => void;
+        onUpdate: (this: { editor: Editor }) => void;
+        onDestroy: (this: { editor: Editor }) => void;
+      };
+      // Model Tiptap's teardown with real ProseMirror state: the destroy
+      // hook runs before the schema is cleared and the view is destroyed.
+      const editor = {
+        state: typeText(stateAt(1, "me"), "hello"),
+        schema: schema as Schema | null,
+        isDestroyed: false,
+        view: { dispatch: vi.fn() },
+      };
+      const context = { editor: editor as unknown as Editor };
+      hooks.onCreate.call(context);
+      expect(submit).toHaveBeenCalledTimes(1);
+
+      // More typing while the first submit is pending must also survive.
+      editor.state = typeText(editor.state, "later");
+      hooks.onUpdate.call(context);
+      hooks.onDestroy.call(context);
+      editor.isDestroyed = true;
+      editor.schema = null;
+      expect(unsubscribe).toHaveBeenCalledOnce();
+      expect(submit).toHaveBeenCalledTimes(2);
+
+      releaseSubmit();
+      expect(await submit.mock.results[0].value).toMatchObject({ status });
+      // The flush either confirms our first step, or rebases over the
+      // foreign step, then submits the remaining local edits.
+      await vi.waitFor(() => expect(submit).toHaveBeenCalledTimes(3));
+      expect(await submit.mock.results[1].value).toMatchObject({
+        status: "needs-rebase",
+      });
+      expect(await submit.mock.results[2].value).toEqual({ status: "synced" });
+      // Let the flush's final confirmation and error handlers finish.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(onSyncError).not.toHaveBeenCalled();
+      expect(editor.view.dispatch).not.toHaveBeenCalled();
+      expect(submitSnapshot).not.toHaveBeenCalled();
+      expect(submit).toHaveBeenCalledTimes(3);
+
+      const server = await t.query(api.lib.getSteps, { id: "doc", version: 1 });
+      expect(server.clientIds).toEqual(
+        status === "synced" ? ["me", "me"] : ["other", "me", "me"],
+      );
+      // Replay the persisted steps to prove the final document contains
+      // every edit exactly once, including edits made after the first submit.
+      let replayed = stateAt(1, "reader");
+      for (const step of server.steps) {
+        replayed = replayed.apply(
+          replayed.tr.step(Step.fromJSON(schema, JSON.parse(step))),
+        );
+      }
+      expect(replayed.doc.textContent).toBe(
+        status === "synced" ? "laterhello" : "remotelaterhello",
+      );
+    },
+  );
+});
 
 describe("onDestroy error reporting", () => {
   test("reports a flush that gave up", async () => {
