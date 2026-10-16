@@ -65,7 +65,7 @@ Features:
 
 See [below](#future-features) for future feature ideas and
 [CONTRIBUTING.md](./CONTRIBUTING.md) for how to contribute. Found a bug? Feature
-request? [File it here](https://github.com/get-convex/prosemirror-sync/issues).
+request? [File it here](https://github.com/convex/prosemirror-sync/issues).
 
 ## Pre-requisite: Convex
 

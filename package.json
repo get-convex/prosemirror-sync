@@ -1,11 +1,11 @@
 {
   "name": "@convex-dev/prosemirror-sync",
   "description": "Sync ProseMirror documents for Tiptap using this Convex component.",
-  "repository": "github:get-convex/prosemirror-sync",
-  "homepage": "https://github.com/get-convex/prosemirror-sync#readme",
+  "repository": "github:convex/prosemirror-sync",
+  "homepage": "https://github.com/convex/prosemirror-sync#readme",
   "bugs": {
     "email": "support@convex.dev",
-    "url": "https://github.com/get-convex/prosemirror-sync/issues"
+    "url": "https://github.com/convex/prosemirror-sync/issues"
   },
   "version": "0.2.7",
   "license": "Apache-2.0",

@@ -36,7 +36,7 @@ function App(props: { id: string }) {
           Powered by {editor} (ProseMirror) + Convex + Vite + React + TypeScript
         </p>
         <a
-          href="https://github.com/get-convex/prosemirror-sync"
+          href="https://github.com/convex/prosemirror-sync"
           className="github-button"
         >
           <svg fill="currentColor" viewBox="0 0 24 24">
